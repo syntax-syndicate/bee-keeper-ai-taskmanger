@@ -1,0 +1,27 @@
+name: Release 
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish-npm:
+    name: Publish on NPM
+    if: github.event.base_ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: release
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - run: mise build
+      - run: |
+          echo "//registry.npmjs.org/:_authToken=${{secrets.NPM_TOKEN}}" > ~/.npmrc
+          pnpm publish --access public --no-git-checks
+        working-directory: .
+        env:
+          NPM_CONFIG_PROVENANCE: true # https://github.com/pnpm/pnpm/issues/6435#issuecomment-1518397267

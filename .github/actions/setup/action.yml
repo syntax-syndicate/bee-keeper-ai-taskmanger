@@ -1,0 +1,53 @@
+name: 'Setup mise environment'
+description: 'Install mise and set up tools from mise.toml'
+inputs:
+  node-version:
+    description: 'Node.js version to use (overrides .mise.toml)'
+    required: false
+    default: ''
+  cache-enabled:
+    description: 'Whether to enable caching'
+    required: false
+    default: 'true'
+  cache-key-prefix:
+    description: 'Prefix for the cache key'
+    required: false
+    default: 'mise'
+  working-directory:
+    description: 'Directory where .mise.toml is located'
+    required: false
+    default: '.'
+
+runs:
+  using: "composite"
+  steps:
+    - name: Install mise
+      uses: jdx/mise-action@5083fe46898c414b2475087cc79da59e7da859e8
+      with:
+        version: 2025.2.6
+    
+    - name: Set Node.js version
+      if: inputs.node-version != ''
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        echo "node = \"${{ inputs.node-version }}\"" >> .mise.toml
+    
+    - name: Cache mise tools
+      if: inputs.cache-enabled == 'true'
+      uses: actions/cache@v3
+      with:
+        path: ~/.local/share/mise
+        key: ${{ runner.os }}-${{ inputs.cache-key-prefix }}-${{ hashFiles(format('{0}/.mise.toml', inputs.working-directory)) }}
+        restore-keys: |
+          ${{ runner.os }}-${{ inputs.cache-key-prefix }}-
+    
+    - name: Install mise tools
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: mise install
+    
+    - name: List installed tools
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: mise list

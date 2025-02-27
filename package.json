@@ -1,0 +1,119 @@
+{
+  "name": "beeai-supervisor",
+  "type": "module",
+  "version": "0.0.1",
+  "private": true,
+  "engines": {
+    "node": ">=22.2.0",
+    "pnpm": ">=10.4.1"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./base/*": {
+      "import": "./dist/base/*",
+      "types": "./dist/base/*.d.ts"
+    },
+    "./helpers/*": {
+      "import": "./dist/helpers/*",
+      "types": "./dist/helpers/*.d.ts"
+    },
+    "./agents/*": {
+      "import": "./dist/agents/*",
+      "types": "./dist/agents/*.d.ts"
+    },
+    "./tasks/*": {
+      "import": "./dist/tasks/*",
+      "types": "./dist/tasks/*.d.ts"
+    },
+    "./workspaces/*": {
+      "import": "./dist/workspaces/*",
+      "types": "./dist/workspaces/*.d.ts"
+    },
+    "./ui/*": {
+      "import": "./dist/ui/*",
+      "types": "./dist/ui/*.d.ts"
+    }
+  },
+  "files": [
+    "dist/**/*"
+  ],
+  "homepage": "https://github.com/i-am-bee/beeai-supervisor#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/i-am-bee/beeai-supervisor.git"
+  },
+  "bugs": {
+    "url": "https://github.com/i-am-bee/beeai-supervisor/issues"
+  },
+  "scripts": {
+    "start": "cross-env NODE_ENV=production BEE_FRAMEWORK_LOG_LEVEL=error node --no-warnings dist/main.js",
+    "start:dev": "tsx --inspect --no-warnings src/main.js",
+    "monitor": "cross-env NODE_ENV=production BEE_FRAMEWORK_LOG_LEVEL=error node --no-warnings dist/ui/main.js",
+    "monitor:dev": "tsx --inspect --no-warnings src/ui/main.js",
+    "ts:check": "tsc --noEmit --project tsconfig.json",
+    "build": "rimraf dist && tsc -b && tsc-alias",
+    "lint": "eslint",
+    "lint:fix": "eslint --fix",
+    "format": "prettier --check .",
+    "format:fix": "prettier --write .",
+    "_ensure_env": "cp -n .env.template .env || true",
+    "prepare": "husky && npm run _ensure_env",
+    "test": "vitest --reporter=dot"
+  },
+  "dependencies": {
+    "@google-cloud/vertexai": "^1.9.2",
+    "@i-am-bee/acp-sdk": "^0.0.1",
+    "@ibm-generative-ai/node-sdk": "^3.2.4",
+    "@modelcontextprotocol/sdk": "^1.5.0",
+    "@opentelemetry/sdk-node": "^0.57.0",
+    "bee-observe-connector": "^0.0.6",
+    "blessed": "^0.1.81",
+    "chokidar": "^4.0.3",
+    "dotenv": "^16.4.5",
+    "ollama": "^0.5.11",
+    "openai": "^4.77.0",
+    "openai-chat-tokens": "^0.2.8",
+    "picocolors": "^1.1.1",
+    "pino": "^9.4.0",
+    "remeda": "^2.20.1",
+    "strip-ansi": "^7.1.0",
+    "vite-tsconfig-paths": "^5.1.4",
+    "vitest": "^3.0.5",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@ai-sdk/openai": "^1.1.14",
+    "@eslint/js": "^9.21.0",
+    "@types/blessed": "^0.1.25",
+    "@types/eslint-config-prettier": "^6.11.3",
+    "@types/eslint__js": "^8.42.3",
+    "@types/node": "^18.15.3",
+    "beeai-framework": "^0.1.2",
+    "cross-env": "^7.0.3",
+    "eslint": "^9.10.0",
+    "eslint-config-prettier": "^9.1.0",
+    "husky": "^9.1.6",
+    "lint-staged": "^15.2.10",
+    "pino-pretty": "^11.2.2",
+    "prettier": "^3.3.3",
+    "rimraf": "^5.0.10",
+    "tsc-alias": "^1.8.10",
+    "tsx": "^4.19.1",
+    "typescript": "~5.5.4",
+    "typescript-eslint": "^8.6.0"
+  },
+  "lint-staged": {
+    "*.{ts,js}": "eslint --fix",
+    "*": "prettier --ignore-unknown --write"
+  },
+  "peerDependencies": {
+    "@ai-sdk/openai": "^1.1.14",
+    "@eslint/js": "^9.21.0",
+    "beeai-framework": "^0.1.2"
+  }
+}

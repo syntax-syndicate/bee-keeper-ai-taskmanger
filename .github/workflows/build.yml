@@ -1,0 +1,24 @@
+name: Build with mise
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      # Use the mise setup action
+      - name: Setup mise
+        uses: ./.github/actions/setup
+        with:
+          cache-key-prefix: 'beeai-supervisor'
+          node-version: '22'
+      
+      - name: Build project
+        run: mise run build

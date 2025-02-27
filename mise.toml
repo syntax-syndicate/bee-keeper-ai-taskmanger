@@ -1,0 +1,145 @@
+[tools]
+nodejs = "22"
+pnpm = "latest"
+"ubi:B1NARY-GR0UP/nwa" = "latest"
+
+[settings]
+raw = true
+node.gpg_verify = false # otherwise failing on github when try to install node
+
+## grouped tasks
+
+[tasks."setup"]
+depends = ["setup:*"]
+
+[tasks."check"]
+depends = ["*:check","*:check:*"]
+
+[tasks."build"]
+depends = ["*:build"]
+
+[tasks."supervisor"]
+depends = ["*:start"]
+
+[tasks."monitor"]
+depends = ["*:monitor"]
+
+[tasks."pack"]
+depends = ["*:pack"]
+
+[tasks."fix"]
+depends = ["*:fix","*:fix:*"]
+
+[tasks."test"]
+depends = ["*:test"]
+
+## git hooks
+
+[tasks."git-hooks:pre-commit"]
+hide = true
+depends = ["check"]
+## repo setup
+
+[tasks."setup:pnpm"]
+hide = true
+dir = "{{config_root}}"
+run = "pnpm install"
+sources = ["pnpm-lock.yaml", "package.json"]
+outputs = { auto = true }
+
+## common tasks
+
+### check
+
+[tasks."common:check"]
+depends = ["common:check:*"]
+
+[tasks."common:check:nwa"]
+dir = "{{config_root}}"
+run = "nwa check -l apache -c 'IBM Corp.' --skip 'src/**/*' '*.{py,js,jsx,ts,tsx,html,css,scss}'"
+# sources don't support {a,b} -- https://github.com/jdx/mise/discussions/4469
+sources = ["src/**/*.js", "src/**/*.js*", "src/**/*.ts", "src/**/*.ts*", "src/**/*.html", "src/**/*.css", "src/**/*.scss"]
+outputs = { auto = true }
+
+### fix
+
+[tasks."common:fix"]
+depends = ["common:fix:*"]
+
+[tasks."common:fix:nwa"]
+dir = "{{config_root}}"
+run = """
+nwa update -l apache -c 'IBM Corp.' --skip 'src/**/*' '*.{py,js,jsx,ts,tsx,html,css,scss}' --mute || true
+nwa add    -l apache -c 'IBM Corp.' --skip 'src/**/*' '*.{py,js,jsx,ts,tsx,html,css,scss}' --mute || true
+"""
+# sources don't support {a,b} -- https://github.com/jdx/mise/discussions/4469
+sources = ["src/**/*.js", "src/**/*.js*", "src/**/*.ts", "src/**/*.ts*", "src/**/*.html", "src/**/*.css", "src/**/*.scss"]
+outputs = { auto = true }
+
+
+## code tasks
+
+### check
+
+[tasks."code:check:prettier"]
+depends = ["setup:pnpm"]
+run = "pnpm prettier --log-level silent --check src"
+sources = ["src/**/*.js", "src/**/*.jsx", "src/**/*.ts", "src/**/*.tsx", "src/**/*.html", "src/**/*.css", "src/**/*.scss"]
+outputs = { auto = true }
+
+[tasks."code:check:eslint"]
+depends = ["setup:pnpm"]
+run = "pnpm eslint src"
+sources = ["src/**/*.js", "src/**/*.jsx", "src/**/*.ts", "src/**/*.tsx"]
+outputs = { auto = true }
+
+[tasks."code:check:tsc"]
+depends = ["setup:pnpm"]
+run = "pnpm tsc --noEmit"
+sources = ["src/**/*.ts", "src/**/*.tsx"]
+outputs = { auto = true }
+
+### fix
+
+[tasks."code:fix:prettier"]
+depends = ["setup:pnpm"]
+run = "pnpm prettier --log-level silent --write src"
+sources = ["src/**/*.js", "src/**/*.jsx", "src/**/*.ts", "src/**/*.tsx", "src/**/*.html", "src/**/*.css", "src/**/*.scss"]
+outputs = { auto = true }
+
+[tasks."code:fix:eslint"]
+depends = ["setup:pnpm"]
+run = "pnpm eslint --fix src"
+sources = ["src/**/*.js", "src/**/*.jsx", "src/**/*.ts", "src/**/*.tsx"]
+outputs = { auto = true }
+
+### clean
+
+[tasks."code:clean"]
+run = "rm -rf ./dist"
+
+### build
+
+[tasks."code:build"]
+depends = ["setup:pnpm", "code:clean", "check"]
+run = "pnpm build"
+sources = ["*.json", "*.js", "src/**/*.tsx", "src/**/*.ts"]
+outputs = ["dist/**/*"]
+
+### start
+
+[tasks."code:start"]
+depends = ["code:build"]
+run = "pnpm start"
+
+### monitor
+
+[tasks."code:monitor"]
+depends = ["code:build"]
+run = "pnpm run monitor"
+
+### pack
+
+[tasks."code:pack"]
+depends = ["code:build"]
+run = "pnpm pack"

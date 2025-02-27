@@ -1,0 +1,35 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "rootDir": "src",
+    "sourceRoot": "src",
+    "baseUrl": ".",
+    "moduleResolution": "NodeNext",
+    "incremental": false,
+    "moduleDetection": "auto",
+    "types": ["node"],
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "allowJs": true,
+    "outDir": "./dist",
+    "esModuleInterop": true,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "useUnknownInCatchVariables": false,
+    "strict": true,
+    "skipLibCheck": true,
+    "strictNullChecks": true,
+    "removeComments": false,
+    "forceConsistentCasingInFileNames": true,
+    "paths": {
+      "@/*": ["./src/*"],
+      "@agents/*": ["./src/agents/*"],
+      "@tasks/*": ["./src/tasks/*"],
+      "@workspaces/*": ["./src/workspaces/*"],
+      "@ui/*": ["./src/ui/*"]
+    }
+  },
+  "include": ["src"]
+}
