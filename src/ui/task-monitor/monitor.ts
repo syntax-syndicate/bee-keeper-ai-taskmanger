@@ -1,4 +1,4 @@
-import blessed from "blessed";
+import blessed from "neo-blessed";
 import { join } from "path";
 import { clone } from "remeda";
 import { stringToAgent } from "@/agents/agent-id.js";

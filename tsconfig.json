@@ -8,7 +8,10 @@
     "moduleResolution": "NodeNext",
     "incremental": false,
     "moduleDetection": "auto",
-    "types": ["node"],
+    "types": [
+      "node",
+      "neo-blessed"
+    ],
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
@@ -24,12 +27,28 @@
     "removeComments": false,
     "forceConsistentCasingInFileNames": true,
     "paths": {
-      "@/*": ["./src/*"],
-      "@agents/*": ["./src/agents/*"],
-      "@tasks/*": ["./src/tasks/*"],
-      "@workspaces/*": ["./src/workspaces/*"],
-      "@ui/*": ["./src/ui/*"]
-    }
+      "@/*": [
+        "./src/*"
+      ],
+      "@agents/*": [
+        "./src/agents/*"
+      ],
+      "@tasks/*": [
+        "./src/tasks/*"
+      ],
+      "@workspaces/*": [
+        "./src/workspaces/*"
+      ],
+      "@ui/*": [
+        "./src/ui/*"
+      ]
+    },
+    "typeRoots": [
+      "./node_modules/@types",
+      "./types"
+    ]
   },
-  "include": ["src"]
+  "include": [
+    "src"
+  ]
 }

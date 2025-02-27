@@ -1,4 +1,4 @@
-import blessed from "blessed";
+import blessed from "neo-blessed";
 import { TaskMonitor } from "./task-monitor/monitor.js";
 import { AgentMonitor } from "./agent-monitor/monitor.js";
 import { BaseMonitor } from "./base/monitor.js";
