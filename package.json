@@ -1,8 +1,8 @@
 {
-  "name": "beeai-supervisor",
+  "name": "@i-am-bee/beeai-supervisor",
   "type": "module",
   "version": "0.0.1",
-  "private": true,
+  "private": false,
   "engines": {
     "node": ">=22.2.0",
     "pnpm": ">=10.4.1"
