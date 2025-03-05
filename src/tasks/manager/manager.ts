@@ -26,6 +26,10 @@ import {
   taskSomeIdToTypeValue,
 } from "../task-id.js";
 import {
+  AutomaticTaskRun,
+  BaseTaskRun,
+  CreateTaskConfig,
+  InteractionTaskRun,
   isTaskRunActiveStatus,
   isTaskRunTerminationStatus,
   TaskConfig,
@@ -39,10 +43,13 @@ import {
   TaskRun,
   TaskRunHistoryEntry,
   TaskRunIdValue,
+  TaskRunKindEnum,
   TaskRunStatusEnumSchema,
   TaskRunTerminalStatusEnum,
   TaskTypeValue,
 } from "./dto.js";
+import EventEmitter from "events";
+import { taskRunOutput } from "./helpers.js";
 
 export type TaskRunRuntime = TaskRun & {
   intervalId: NodeJS.Timeout | null;
@@ -78,6 +85,13 @@ export type OnTaskStart = (
       agentId: AgentIdValue,
       taskManage: TaskManager,
     ) => void;
+    onAgentUpdate: (
+      key: string,
+      value: string,
+      taskRunId: TaskRunIdValue,
+      agentId: AgentIdValue,
+      taskManage: TaskManager,
+    ) => void;
     onAgentComplete: (
       output: string,
       taskRunId: TaskRunIdValue,
@@ -92,6 +106,12 @@ export type OnTaskStart = (
     ) => void;
   },
 ) => Promise<unknown>;
+
+interface TaskManagerEvents {
+  "task_run:start": (taskRun: TaskRun) => void;
+  "task_run:complete": (taskRun: TaskRun) => void;
+  "task_run:error": (taskRun: TaskRun) => void;
+}
 
 export interface TaskManagerConfig {
   onTaskStart: OnTaskStart;
@@ -124,21 +144,13 @@ export class TaskManager extends WorkspaceRestorable {
   private onTaskStart: OnTaskStart;
   private options: TaskMangerOptions;
   private _switches: TaskManagerSwitches;
+  private emitter = new EventEmitter();
 
   constructor({ onTaskStart, options, switches }: TaskManagerConfig) {
     super(TASK_MANAGER_CONFIG_PATH, TASK_MANAGER_USER);
     this.logger.info("Initializing TaskManager");
     this.stateLogger = TaskStateLogger.getInstance();
     this.agentStateLogger = AgentStateLogger.getInstance();
-
-    this.ac = new ResourcesAccessControl(this.constructor.name, [
-      TASK_MANAGER_USER,
-    ]);
-    this.ac.createResource(
-      TASK_MANAGER_RESOURCE,
-      TASK_MANAGER_USER,
-      TASK_MANAGER_USER,
-    );
 
     this.onTaskStart = onTaskStart;
 
@@ -151,6 +163,18 @@ export class TaskManager extends WorkspaceRestorable {
       maxHistoryEntries: 100, // Default to keeping last 100 entries
       ...(options || {}),
     };
+
+    this.ac = new ResourcesAccessControl(
+      this.constructor.name,
+      [TASK_MANAGER_USER].concat(
+        this.options.adminIds ? this.options.adminIds : [],
+      ),
+    );
+    this.ac.createResource(
+      TASK_MANAGER_RESOURCE,
+      TASK_MANAGER_USER,
+      TASK_MANAGER_USER,
+    );
 
     // Initialize task pools for all task kinds
     this.taskConfigs = new Map(
@@ -168,6 +192,31 @@ export class TaskManager extends WorkspaceRestorable {
         this.logger.error(err, "Process next start task error");
       }
     }, 100); // Runs every 100ms (0.1 second)
+  }
+
+  public addAdmin(adminId: string) {
+    this.ac.addAdmin(adminId);
+  }
+
+  public on<K extends keyof TaskManagerEvents>(
+    event: K,
+    listener: TaskManagerEvents[K],
+  ): typeof this.emitter {
+    return this.emitter.on(event, listener);
+  }
+
+  public off<K extends keyof TaskManagerEvents>(
+    event: K,
+    listener: TaskManagerEvents[K],
+  ): typeof this.emitter {
+    return this.emitter.off(event, listener);
+  }
+
+  public emit<K extends keyof TaskManagerEvents>(
+    event: K,
+    ...args: Parameters<TaskManagerEvents[K]>
+  ): boolean {
+    return this.emitter.emit(event, ...args);
   }
 
   get switches() {
@@ -462,10 +511,7 @@ export class TaskManager extends WorkspaceRestorable {
   }
 
   createTaskConfig(
-    config: Omit<
-      TaskConfig,
-      "taskConfigVersion" | "taskConfigId" | "ownerAgentId"
-    >,
+    config: CreateTaskConfig,
     ownerAgentId: string,
     actingAgentId: AgentIdValue,
     persist = true,
@@ -587,6 +633,17 @@ export class TaskManager extends WorkspaceRestorable {
       );
     }
     return taskConfigVersions;
+  }
+
+  findTaskConfig(...args: Parameters<typeof this.getTaskConfig>) {
+    let taskConfig;
+    try {
+      taskConfig = this.getTaskConfig(...args);
+    } catch {
+      // PASS
+    }
+
+    return taskConfig;
   }
 
   getTaskConfig(
@@ -786,11 +843,37 @@ export class TaskManager extends WorkspaceRestorable {
     this.persist();
   }
 
+  getAllTaskConfigs(actingAgentId: AgentIdValue) {
+    this.logger.info({ actingAgentId }, "Getting all task configs");
+
+    const taskConfigs = Array.from(this.taskConfigs.values())
+      .map((taskKindConfig) => Array.from(taskKindConfig.values()))
+      .flat(2)
+      .filter((taskConfig) =>
+        this.ac.hasPermission(
+          taskConfig.taskConfigId,
+          actingAgentId,
+          READ_ONLY_ACCESS,
+        ),
+      );
+
+    this.logger.debug(
+      { actingAgentId, count: taskConfigs.length },
+      "Retrieved task runs",
+    );
+    return taskConfigs;
+  }
+
   createTaskRun(
     taskKind: TaskKindEnum,
     taskType: TaskTypeValue,
+    taskRunKind: TaskRunKindEnum,
     taskRunInput: string,
     actingAgentId: AgentIdValue,
+    options?: {
+      originTaskRunId?: TaskRunIdValue;
+      blockedByTaskRunIds?: TaskRunIdValue[];
+    },
   ): TaskRun {
     this.logger.debug(
       {
@@ -822,7 +905,7 @@ export class TaskManager extends WorkspaceRestorable {
       taskConfigVersion,
       actingAgentId,
     );
-    const taskRunNum = versionPoolStats.created + 1;
+    const taskRunNum = versionPoolStats.total + 1;
     const taskRunId = taskRunIdToString({
       taskKind,
       taskType,
@@ -837,13 +920,21 @@ export class TaskManager extends WorkspaceRestorable {
       );
     }
 
-    const taskRun: TaskRun = {
+    const input =
+      config.agentKind === "supervisor"
+        ? `You are acting on behalf of task (your taskRunId:${taskRunId}). 
+
+${taskRunInput}`
+        : taskRunInput;
+
+    const baseTaskRun: BaseTaskRun = {
       taskKind,
       taskType,
       taskRunId,
+      originTaskRunId: options?.originTaskRunId ?? taskRunId,
       taskConfigVersion: config.taskConfigVersion,
       taskRunNum,
-      taskRunInput: taskRunInput,
+      taskRunInput: input,
       config: clone(config),
       status: "CREATED",
       currentRetryAttempt: 0,
@@ -851,20 +942,56 @@ export class TaskManager extends WorkspaceRestorable {
       errorCount: 0,
       ownerAgentId: config.ownerAgentId,
       completedRuns: 0,
+      currentTrajectory: [],
       history: [],
+      isDependent: false,
+      blockedByTaskRunIds: options?.blockedByTaskRunIds ?? [],
+      blockingTaskRunIds: [],
     };
+
+    let taskRun: InteractionTaskRun | AutomaticTaskRun;
+    if (taskRunKind === "interaction") {
+      const interactionTaskRun: InteractionTaskRun = {
+        ...baseTaskRun,
+        taskRunKind: "interaction",
+        interactionStatus: "PENDING",
+      };
+      taskRun = interactionTaskRun;
+    } else {
+      const automaticTaskRun: AutomaticTaskRun = {
+        ...baseTaskRun,
+        taskRunKind: "automatic",
+      };
+      taskRun = automaticTaskRun;
+    }
+
     this.taskRuns.set(taskRunId, {
       intervalId: null,
       ...taskRun,
     });
 
     this.stateLogger.logTaskRunCreate({
-      taskConfigId: taskRun.config.taskConfigId,
+      taskConfigId: baseTaskRun.config.taskConfigId,
       taskRunId,
       taskRun,
     });
 
-    this.ac.createResource(taskRunId, actingAgentId, actingAgentId);
+    if (!this.ac.hasResource(taskRunId, actingAgentId, actingAgentId)) {
+      this.ac.createResource(taskRunId, actingAgentId, actingAgentId);
+    }
+
+    if (options?.blockedByTaskRunIds) {
+      for (const blockedByTaskRunId of options.blockedByTaskRunIds) {
+        const blockedByTaskRun = this.getTaskRun(
+          blockedByTaskRunId,
+          actingAgentId,
+          WRITE_ONLY_ACCESS,
+        );
+        this._updateTaskRun(blockedByTaskRunId, blockedByTaskRun, {
+          blockingTaskRunIds: [taskRunId],
+        });
+      }
+    }
 
     const pool = this.getTaskTypeVersionSetsArray(taskKind, taskType)!;
     let poolVersionSetArrayItem = pool.find((p) => p[0] === taskConfigVersion);
@@ -903,6 +1030,7 @@ export class TaskManager extends WorkspaceRestorable {
   scheduleStartTaskRun(
     taskRunId: TaskRunIdValue,
     actingAgentId: AgentIdValue,
+    manualStart = true,
   ): void {
     this.logger.info({ taskRunId, actingAgentId }, "Schedule task run start");
     this.ac.checkPermission(taskRunId, actingAgentId, FULL_ACCESS);
@@ -911,6 +1039,16 @@ export class TaskManager extends WorkspaceRestorable {
     if (!taskRun) {
       this.logger.error({ taskRunId }, "Task run not found");
       throw new Error(`Task run ${taskRunId} not found`);
+    }
+
+    if (manualStart) {
+      if (
+        taskRun.blockedByTaskRunIds.length &&
+        !this.ac.hasPermission(taskRunId, actingAgentId, FULL_ACCESS)
+      ) {
+        this.logger.error({ taskRunId }, "Task run not found");
+        throw new Error(`Can't manually start depending task `);
+      }
     }
 
     const { taskKind, taskType, taskConfigVersion } = taskRun;
@@ -934,6 +1072,16 @@ export class TaskManager extends WorkspaceRestorable {
       status: "SCHEDULED",
     });
     this.scheduledTasksToStart.push({ taskRunId, actingAgentId });
+  }
+
+  scheduleStartMultipleTaskRuns(
+    taskRunIds: string[],
+    actingAgentId: string,
+    manualStart = true,
+  ) {
+    for (const taskRunId of taskRunIds) {
+      this.scheduleStartTaskRun(taskRunId, actingAgentId, manualStart);
+    }
   }
 
   async processNextStartTask() {
@@ -984,6 +1132,26 @@ export class TaskManager extends WorkspaceRestorable {
     this.logger.info({ taskRunId }, "Task started successfully");
   }
 
+  private appendUpdatedTaskRunInputForSupervisor(
+    existingInput: string,
+    newTaskRun: TaskRun,
+  ) {
+    // If this is the first output being added, create the full context intro
+    if (!existingInput || !existingInput.includes("**Outputs: **")) {
+      return `**Context:**\nYou are receiving outputs of previous task(s) run it is a part of workflow started by ${newTaskRun.originTaskRunId}. Base on these outputs and you original assignment you should plan next steps or return response.\n\n**Outputs: ** \nTask Run Id: \`${newTaskRun.taskRunId}\`\nInput: ${newTaskRun.taskRunInput}\nOutput: ${taskRunOutput(newTaskRun)}`;
+    }
+
+    // If the input already exists, just append the new task run output information
+    return `${existingInput}\n\nTask Run Id: \`${newTaskRun.taskRunId}\`\nInput: ${newTaskRun.taskRunInput}\nOutput: ${taskRunOutput(newTaskRun)}`;
+  }
+
+  private appendUpdatedTaskRunInputForOperator(
+    existingInput: string,
+    newTaskRun: TaskRun,
+  ) {
+    return `${existingInput && existingInput.length ? `${existingInput}\n\n` : ""}${taskRunOutput(newTaskRun)}`;
+  }
+
   stopTaskRun(
     taskRunId: TaskRunIdValue,
     actingAgentId: AgentIdValue,
@@ -1009,10 +1177,64 @@ export class TaskManager extends WorkspaceRestorable {
       this.releaseTaskRunOccupancy(taskRunId, actingAgentId);
     }
 
+    if (taskRun.taskRunKind === "automatic") {
+      if (taskRun.blockingTaskRunIds.length > 0) {
+        // Run blocking task runs
+
+        for (const blockingTaskRunId of taskRun.blockingTaskRunIds) {
+          const blockingTaskRun = this.getTaskRun(
+            blockingTaskRunId,
+            TASK_MANAGER_USER,
+          );
+          this._updateTaskRun(blockingTaskRunId, blockingTaskRun, {
+            taskRunInput: (taskRun.taskKind === "supervisor"
+              ? this.appendUpdatedTaskRunInputForSupervisor
+              : this.appendUpdatedTaskRunInputForOperator)(
+              taskRun.taskRunInput,
+              taskRun,
+            ),
+            originTaskRunId: taskRun.originTaskRunId,
+          });
+        }
+
+        this.scheduleStartMultipleTaskRuns(
+          taskRun.blockingTaskRunIds,
+          TASK_MANAGER_USER,
+          false,
+        );
+      } else {
+        // Close interaction
+        const originateInteraction = this.getTaskRun(
+          taskRun.originTaskRunId,
+          TASK_MANAGER_USER,
+        );
+        if (!originateInteraction) {
+          throw new Error(
+            `Originate interaction task run \`${taskRun.originTaskRunId}\` is missing`,
+          );
+        }
+        if (originateInteraction.taskRunKind != "interaction") {
+          throw new Error(
+            `Originate task run \`${taskRun.originTaskRunId}\` is not an interaction`,
+          );
+        }
+
+        this._updateTaskRun(
+          originateInteraction.taskRunId,
+          originateInteraction,
+          {
+            interactionStatus: "COMPLETED",
+            response: taskRunOutput(taskRun, false),
+          },
+        );
+      }
+    }
+
     this._updateTaskRun(taskRunId, taskRun, {
       status: isCompleted ? "COMPLETED" : "STOPPED",
       nextRunAt: undefined,
     });
+
     this.logger.info({ taskRunId }, "Task stopped successfully");
   }
 
@@ -1108,6 +1330,26 @@ export class TaskManager extends WorkspaceRestorable {
     });
   }
 
+  findTaskRunsOwnedBy(agentId: AgentIdValue, actingAgentId: AgentIdValue) {
+    this.logger.info(
+      { agentId, actingAgentId },
+      "Looking for running tasks owned by agent",
+    );
+    const result = [];
+    for (const task of this.taskRuns.values()) {
+      if (task.ownerAgentId === agentId) {
+        this.ac.checkPermission(
+          task.taskRunId,
+          actingAgentId,
+          READ_ONLY_ACCESS,
+        );
+        result.push(clone(task));
+      }
+    }
+
+    return result;
+  }
+
   private setTaskRunAwaitingAgent(taskRunId: TaskRunIdValue) {
     this.logger.info({ taskRunId }, "Setting task run awaiting agent");
 
@@ -1126,7 +1368,7 @@ export class TaskManager extends WorkspaceRestorable {
       agentTypeId: agentSomeIdToTypeValue({
         agentKind: taskRun.config.agentKind,
         agentType: taskRun.config.agentType,
-        agentConfigVersion: taskRun.config.agentVersion,
+        agentConfigVersion: taskRun.config.agentConfigVersion,
       }),
     });
   }
@@ -1269,6 +1511,38 @@ export class TaskManager extends WorkspaceRestorable {
     }
   }
 
+  addBlockingTaskRuns(
+    taskRunId: TaskRunIdValue,
+    blockingTaskRunIds: TaskRunIdValue[],
+    actingAgentId: AgentIdValue,
+  ) {
+    this.logger.info(
+      { taskRunId, actingAgentId, blockingTaskRunIds },
+      "Add blocking task run",
+    );
+
+    for (const blockingTaskRunId of blockingTaskRunIds) {
+      const blockingTaskRun = this.getTaskRun(
+        blockingTaskRunId,
+        actingAgentId,
+        WRITE_ONLY_ACCESS,
+      );
+      this._updateTaskRun(blockingTaskRunId, blockingTaskRun, {
+        blockedByTaskRunIds: [taskRunId],
+      });
+    }
+
+    const taskRun = this.getTaskRun(
+      taskRunId,
+      actingAgentId,
+      WRITE_ONLY_ACCESS,
+    );
+
+    return this._updateTaskRun(taskRunId, taskRun, {
+      blockingTaskRunIds,
+    });
+  }
+
   /**
    * Update task status
    */
@@ -1281,17 +1555,41 @@ export class TaskManager extends WorkspaceRestorable {
       { taskRunId, actingAgentId, update },
       "Updating task status",
     );
-    const status = this.getTaskRun(taskRunId, actingAgentId, WRITE_ONLY_ACCESS);
-    return this._updateTaskRun(taskRunId, status, update);
+    const taskRun = this.getTaskRun(
+      taskRunId,
+      actingAgentId,
+      WRITE_ONLY_ACCESS,
+    );
+    return this._updateTaskRun(taskRunId, taskRun, update);
   }
 
-  // Just for auditlog
   private _updateTaskRun(
     taskRunId: TaskRunIdValue,
     taskRun: TaskRun,
     update: Partial<TaskRun>,
   ): TaskRun {
-    updateDeepPartialObject(taskRun, update);
+    const modifiedUpdate = clone(update);
+    if (modifiedUpdate.currentTrajectory) {
+      modifiedUpdate.currentTrajectory = taskRun.currentTrajectory.concat(
+        modifiedUpdate.currentTrajectory,
+      );
+    }
+    if (modifiedUpdate.blockedByTaskRunIds) {
+      modifiedUpdate.blockedByTaskRunIds = taskRun.blockedByTaskRunIds.concat(
+        modifiedUpdate.blockedByTaskRunIds,
+      );
+
+      if (modifiedUpdate.blockedByTaskRunIds.length) {
+        modifiedUpdate.isDependent = true;
+      }
+    }
+
+    if (modifiedUpdate.blockingTaskRunIds) {
+      modifiedUpdate.blockingTaskRunIds = taskRun.blockingTaskRunIds.concat(
+        modifiedUpdate.blockingTaskRunIds,
+      );
+    }
+    updateDeepPartialObject(taskRun, modifiedUpdate);
     this.stateLogger.logTaskRunUpdate({ taskRunId, taskRun: update });
     if (update.status) {
       const { taskKind, taskType } = taskRun;
@@ -1392,6 +1690,8 @@ export class TaskManager extends WorkspaceRestorable {
           : undefined,
     });
 
+    this.emit("task_run:start", clone(taskRun));
+
     this.logger.debug(
       {
         taskRunId,
@@ -1401,6 +1701,7 @@ export class TaskManager extends WorkspaceRestorable {
       "Executing task callback",
     );
 
+    const emit = this.emit.bind(this);
     await this.onTaskStart(taskRun, this, {
       onAwaitingAgentAcquired(taskRunId, taskManager) {
         taskManager.setTaskRunAwaitingAgent(taskRunId);
@@ -1408,14 +1709,26 @@ export class TaskManager extends WorkspaceRestorable {
       onAgentAcquired(taskRunId, agentId, taskManager) {
         taskManager.setTaskRunOccupied(taskRunId, agentId);
       },
-      onAgentComplete(output, taskRunId, agentId, taskManager) {
+      onAgentUpdate(key, value, taskRunId, agentId, taskManager) {
         const taskRun = taskManager.getTaskRun(
           taskRunId,
           agentId,
           READ_WRITE_ACCESS,
         );
         taskManager._updateTaskRun(taskRunId, taskRun, {
+          currentTrajectory: [{ timestamp: new Date(), agentId, key, value }],
+        });
+      },
+      onAgentComplete(output, taskRunId, agentId, taskManager) {
+        const taskRun = taskManager.getTaskRun(
+          taskRunId,
+          agentId,
+          READ_WRITE_ACCESS,
+        );
+        const trajectory = clone(taskRun.currentTrajectory);
+        taskManager._updateTaskRun(taskRunId, taskRun, {
           completedRuns: taskRun.completedRuns + 1,
+          currentTrajectory: [],
         });
 
         // Record history entry
@@ -1428,8 +1741,11 @@ export class TaskManager extends WorkspaceRestorable {
           retryAttempt: taskRun.currentRetryAttempt,
           maxRepeats: taskRun.config.maxRepeats,
           agentId: agentId,
+          trajectory,
           executionTimeMs: Date.now() - startTime,
         });
+
+        emit("task_run:complete", clone(taskRun));
 
         taskManager.logger.debug(
           {
@@ -1468,9 +1784,12 @@ export class TaskManager extends WorkspaceRestorable {
         }
 
         const taskRun = taskManager.getTaskRun(taskRunId, agentId);
+        const trajectory = clone(taskRun.currentTrajectory);
+
         taskManager._updateTaskRun(taskRunId, taskRun, {
           errorCount: taskRun.errorCount + 1,
           completedRuns: taskRun.completedRuns + 1,
+          currentTrajectory: [],
         });
         const retryAttempt = taskRun.currentRetryAttempt;
 
@@ -1484,8 +1803,11 @@ export class TaskManager extends WorkspaceRestorable {
           retryAttempt,
           maxRepeats: taskRun.config.maxRepeats,
           agentId: agentId,
+          trajectory,
           executionTimeMs: Date.now() - startTime,
         });
+
+        emit("task_run:error", clone(taskRun));
 
         taskManager.logger.error(
           {
@@ -1509,8 +1831,8 @@ export class TaskManager extends WorkspaceRestorable {
           "Releasing task occupancy before removal",
         );
         taskManager.releaseTaskRunOccupancy(taskRunId, agentId);
-        if (taskRun.config.maxRepeats) {
-          if (retryAttempt >= taskRun.config.maxRepeats) {
+        if (taskRun.config.maxRetries) {
+          if (retryAttempt >= taskRun.config.maxRetries) {
             taskManager.stopTaskRun(taskRunId, taskRun.config.ownerAgentId);
           } else {
             taskManager._updateTaskRun(taskRunId, taskRun, {

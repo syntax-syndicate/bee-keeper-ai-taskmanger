@@ -221,21 +221,53 @@ export class AgentStateBuilder extends BaseStateBuilder<
     const { agentType } = data;
     const agentConfigId = stringToAgentConfig(data.agentConfigId);
 
+    const agentConfigTypePool = this.state.agentConfigs.get(agentType);
     // Remove the config
-    if (!this.state.agentConfigs.has(agentType)) {
+    if (!agentConfigTypePool) {
       throw new Error(
-        `Agent pool type: ${agentType} was not found for destruction`,
+        `Agent config pool type: ${agentType} was not found for destruction`,
       );
     }
-    this.state.agentConfigs.delete(agentType);
+
+    const agentConfigTypeVersionIndex = agentConfigTypePool.findIndex(
+      (version) =>
+        version.agentConfigVersion === agentConfigId.agentConfigVersion,
+    );
+    if (agentConfigTypeVersionIndex < 0) {
+      throw new Error(
+        `Agent config version: ${agentConfigId.agentConfigVersion} of type: ${agentType} was not found for destruction`,
+      );
+    }
+    agentConfigTypePool.splice(agentConfigTypeVersionIndex, 1);
+
+    if (!agentConfigTypePool.length) {
+      // Remove whole type if there is no other version
+      this.state.agentConfigs.delete(agentType);
+    }
 
     // Clean up related pool
     const agentKindPool = this.state.agentPools.get(agentConfigId.agentKind);
-    if (agentKindPool) {
+    if (!agentKindPool) {
+      throw new Error(
+        `Agent pool kind: ${agentConfigId.agentKind} was not found for destruction`,
+      );
+    }
+
+    const agentTypePool = agentKindPool.get(agentConfigId.agentType);
+    if (!agentTypePool) {
+      throw new Error(
+        `Agent pool kind: ${agentConfigId.agentKind} type: ${agentConfigId.agentType} was not found for destruction`,
+      );
+    }
+    const agentTypeVersionIndex = agentTypePool.versions.findIndex(
+      ([version]) => version === agentConfigId.agentConfigVersion,
+    );
+    if (agentTypeVersionIndex >= 0) {
+      agentTypePool.versions.splice(agentTypeVersionIndex, 1);
+    }
+
+    if (!agentTypePool.versions.length) {
       agentKindPool.delete(agentConfigId.agentType);
-      if (agentKindPool.size === 0) {
-        this.state.agentPools.delete(agentConfigId.agentKind);
-      }
     }
   }
 

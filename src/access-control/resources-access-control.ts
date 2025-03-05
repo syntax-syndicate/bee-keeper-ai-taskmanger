@@ -51,6 +51,10 @@ export class ResourcesAccessControl {
     admins.forEach((adminId) => this.registry.admins.add(adminId));
   }
 
+  addAdmin(adminId: string) {
+    this.registry.admins.add(adminId);
+  }
+
   private checkReservedConstants(...requestedIds: (UserId | ResourceId)[]) {
     RESERVED_IDS.forEach((id) => {
       requestedIds.forEach((requestedId) => {
@@ -177,6 +181,13 @@ export class ResourcesAccessControl {
       userPermissions: new Map(),
     } satisfies ResourcePermissions;
     this.registry.resources.set(resourceId, resourcePermissions);
+  }
+
+  hasResource(resourceId: ResourceId, ownerId: UserId, actingUserId: UserId) {
+    this.logger.debug({ resourceId, ownerId, actingUserId }, `hasResource`);
+
+    const resource = this.getResourcePermissions(resourceId, false);
+    return resource && resource.ownerId === ownerId;
   }
 
   removeResource(resourceId: ResourceId, actingUserId: UserId) {

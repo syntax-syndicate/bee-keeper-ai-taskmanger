@@ -174,7 +174,21 @@ export class TaskStateBuilder extends BaseStateBuilder<
           );
         }
 
-        updateDeepPartialObject(taskRunInfo.taskRun, data.taskRun);
+        const modifiedUpdate = clone(data.taskRun);
+        if (modifiedUpdate.currentTrajectory) {
+          modifiedUpdate.currentTrajectory =
+            taskRunInfo.taskRun.currentTrajectory.concat(
+              modifiedUpdate.currentTrajectory,
+            );
+        }
+        if (modifiedUpdate.blockedByTaskRunIds) {
+          modifiedUpdate.blockedByTaskRunIds =
+            taskRunInfo.taskRun.blockedByTaskRunIds.concat(
+              modifiedUpdate.blockedByTaskRunIds,
+            );
+        }
+
+        updateDeepPartialObject(taskRunInfo.taskRun, modifiedUpdate);
         break;
       }
       case "task_run_destroy": {
