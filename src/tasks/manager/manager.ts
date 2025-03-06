@@ -58,6 +58,7 @@ export type TaskRunRuntime = TaskRun & {
 const TASK_MANAGER_RESOURCE = "task_manager";
 const TASK_MANAGER_USER = "task_manager_user";
 const TASK_MANAGER_CONFIG_PATH = ["configs", "task_manager.jsonl"] as const;
+const TASK_INPUT_DELIMITER = "This is your input for this task:";
 
 const MAX_POOL_SIZE = 100;
 
@@ -119,6 +120,7 @@ export interface TaskManagerConfig {
   switches?: TaskManagerSwitches;
 }
 
+const BLOCKING_TASK_OUTPUT_PLACEHOLDER = "${blocking_task_output}";
 export class TaskManager extends WorkspaceRestorable {
   /** Map of registered task type and their configurations */
   private taskConfigs: Map<TaskKindEnum, Map<TaskTypeValue, TaskConfig[]>>;
@@ -920,12 +922,12 @@ export class TaskManager extends WorkspaceRestorable {
       );
     }
 
-    const input =
-      config.agentKind === "supervisor"
-        ? `You are acting on behalf of task (your taskRunId:${taskRunId}). 
-
-${taskRunInput}`
-        : taskRunInput;
+    const input = this.composeTaskRunInput(
+      `You are acting on behalf of task \`${taskRunId}\`:\n${config.description}\n\n`,
+      options?.blockedByTaskRunIds?.length
+        ? BLOCKING_TASK_OUTPUT_PLACEHOLDER
+        : taskRunInput,
+    );
 
     const baseTaskRun: BaseTaskRun = {
       taskKind,
@@ -1132,24 +1134,37 @@ ${taskRunInput}`
     this.logger.info({ taskRunId }, "Task started successfully");
   }
 
-  private appendUpdatedTaskRunInputForSupervisor(
-    existingInput: string,
-    newTaskRun: TaskRun,
-  ) {
-    // If this is the first output being added, create the full context intro
-    if (!existingInput || !existingInput.includes("**Outputs: **")) {
-      return `**Context:**\nYou are receiving outputs of previous task(s) run it is a part of workflow started by ${newTaskRun.originTaskRunId}. Base on these outputs and you original assignment you should plan next steps or return response.\n\n**Outputs: ** \nTask Run Id: \`${newTaskRun.taskRunId}\`\nInput: ${newTaskRun.taskRunInput}\nOutput: ${taskRunOutput(newTaskRun)}`;
-    }
-
-    // If the input already exists, just append the new task run output information
-    return `${existingInput}\n\nTask Run Id: \`${newTaskRun.taskRunId}\`\nInput: ${newTaskRun.taskRunInput}\nOutput: ${taskRunOutput(newTaskRun)}`;
+  private composeTaskRunInput(context: string, input: string) {
+    return `${context}${TASK_INPUT_DELIMITER}\n${input}`;
   }
 
-  private appendUpdatedTaskRunInputForOperator(
-    existingInput: string,
-    newTaskRun: TaskRun,
-  ) {
-    return `${existingInput && existingInput.length ? `${existingInput}\n\n` : ""}${taskRunOutput(newTaskRun)}`;
+  private decomposeTaskRunInput(input: string) {
+    const result: {
+      context: string;
+      input: string;
+    } = { context: "", input: "" };
+    const splitted = input.split(TASK_INPUT_DELIMITER);
+    if (splitted.length > 1) {
+      const [context, ...rest] = splitted;
+      result.context = context;
+      result.input = rest.join("");
+    } else {
+      result.input = splitted[0];
+    }
+
+    return result;
+  }
+
+  private setTaskRunInput(existingInput: string, newInput: string) {
+    const existingInputDec = this.decomposeTaskRunInput(existingInput);
+
+    let finalInput = newInput;
+    if (existingInputDec.input.includes(BLOCKING_TASK_OUTPUT_PLACEHOLDER)) {
+      // Append input
+      finalInput = `${existingInputDec.input.replace(BLOCKING_TASK_OUTPUT_PLACEHOLDER, "")}\n\n${finalInput}`;
+    }
+
+    return this.composeTaskRunInput(existingInputDec.context, finalInput);
   }
 
   stopTaskRun(
@@ -1178,7 +1193,13 @@ ${taskRunInput}`
     }
 
     if (taskRun.taskRunKind === "interaction") {
-      if (!taskRun.blockingTaskRunIds.length) {
+      if (
+        !Array.from(this.taskRuns.values()).some(
+          (run) =>
+            run.taskRunKind === "automatic" &&
+            run.originTaskRunId === taskRun.taskRunId,
+        )
+      ) {
         // Bypass response
         this._updateTaskRun(taskRunId, taskRun, {
           interactionStatus: "COMPLETED",
@@ -1195,11 +1216,9 @@ ${taskRunInput}`
             TASK_MANAGER_USER,
           );
           this._updateTaskRun(blockingTaskRunId, blockingTaskRun, {
-            taskRunInput: (taskRun.taskKind === "supervisor"
-              ? this.appendUpdatedTaskRunInputForSupervisor
-              : this.appendUpdatedTaskRunInputForOperator)(
-              taskRun.taskRunInput,
-              taskRun,
+            taskRunInput: this.setTaskRunInput(
+              blockingTaskRun.taskRunInput,
+              taskRunOutput(taskRun, false),
             ),
             originTaskRunId: taskRun.originTaskRunId,
           });
