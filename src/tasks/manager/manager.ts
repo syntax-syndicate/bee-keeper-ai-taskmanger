@@ -110,6 +110,7 @@ export type OnTaskStart = (
 
 interface TaskManagerEvents {
   "task_run:start": (taskRun: TaskRun) => void;
+  "task_run:trajectory_update": (taskRun: TaskRun) => void;
   "task_run:complete": (taskRun: TaskRun) => void;
   "task_run:error": (taskRun: TaskRun) => void;
 }
@@ -1745,6 +1746,7 @@ export class TaskManager extends WorkspaceRestorable {
         taskManager._updateTaskRun(taskRunId, taskRun, {
           currentTrajectory: [{ timestamp: new Date(), agentId, key, value }],
         });
+        emit("task_run:trajectory_update", clone(taskRun));
       },
       onAgentComplete(output, taskRunId, agentId, taskManager) {
         const taskRun = taskManager.getTaskRun(

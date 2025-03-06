@@ -106,6 +106,18 @@ export class Runtime {
     };
     this.taskManager.on("task_run:start", onTaskRunStart);
 
+    const onTaskRunTrajectoryUpdate = (taskRun: TaskRun) => {
+      outputMethod({
+        kind: "progress",
+        taskRun,
+        text: taskRun.currentTrajectory.at(-1)?.value || "",
+      });
+    };
+    this.taskManager.on(
+      "task_run:trajectory_update",
+      onTaskRunTrajectoryUpdate,
+    );
+
     const onTaskRunError = (taskRun: TaskRun) => {
       const agent = getAgent(taskRun);
       outputMethod({
