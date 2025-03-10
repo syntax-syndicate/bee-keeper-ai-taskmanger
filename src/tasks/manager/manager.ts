@@ -44,6 +44,7 @@ import {
   TaskRunHistoryEntry,
   TaskRunIdValue,
   TaskRunKindEnum,
+  TaskRunStatusEnum,
   TaskRunStatusEnumSchema,
   TaskRunTerminalStatusEnum,
   TaskTypeValue,
@@ -1254,12 +1255,17 @@ export class TaskManager extends WorkspaceRestorable {
     }
 
     if (manualStart) {
-      if (
-        taskRun.blockedByTaskRunIds.length &&
-        !this.ac.hasPermission(taskRunId, actingAgentId, FULL_ACCESS)
-      ) {
-        this.logger.error({ taskRunId }, "Task run not found");
-        throw new Error(`Can't manually start depending task `);
+      const blockedTaskRuns = this.collectBlockedTaskRuns(
+        taskRun.blockedByTaskRunIds,
+      );
+      if (blockedTaskRuns.length) {
+        this.logger.error(
+          { taskRunId, blockedTaskRuns },
+          "Start blocking task attempt error",
+        );
+        throw new Error(
+          `Start depending task attempt error. The task run is blocked by ${JSON.stringify(blockedTaskRuns)}`,
+        );
       }
     }
 
@@ -1295,6 +1301,48 @@ export class TaskManager extends WorkspaceRestorable {
       relatedId: taskRunId,
       success: true,
     };
+  }
+
+  private collectBlockedTaskRuns(
+    blockedTaskRunIds: TaskRunIdValue[],
+    visited: TaskRunIdValue[] = [],
+  ) {
+    const result: {
+      taskRunId: TaskRunIdValue;
+      status: TaskRunStatusEnum;
+      blocking: TaskRunIdValue[];
+    }[] = [];
+    for (const blockedTaskRunId of blockedTaskRunIds) {
+      if (visited.includes(blockedTaskRunId)) {
+        // Skip visited
+        continue;
+      }
+
+      const blockedByTaskRun = this.getTaskRun(
+        blockedTaskRunId,
+        TASK_MANAGER_USER,
+      );
+      visited.push(blockedTaskRunId);
+
+      if (
+        blockedByTaskRun.status === "CREATED" &&
+        blockedByTaskRun.blockedByTaskRunIds.length
+      ) {
+        result.push(
+          ...this.collectBlockedTaskRuns(
+            blockedByTaskRun.blockedByTaskRunIds,
+            visited,
+          ),
+        );
+      } else {
+        result.push({
+          taskRunId: blockedByTaskRun.taskRunId,
+          status: blockedByTaskRun.status,
+          blocking: clone(visited),
+        });
+      }
+    }
+    return result;
   }
 
   private composeTaskRunInput(context: string, input: string) {
