@@ -1,16 +1,17 @@
 import { AgentWithInstance } from "@/agents/registry/dto.js";
 import { AgentRegistry } from "@/agents/registry/registry.js";
 import { PROCESS_AND_PLAN_TASK_NAME } from "@/agents/supervisor.js";
+import { RuntimeOutput } from "@/runtime/dto.js";
 import { isTaskRunTerminationStatus, TaskRun } from "@/tasks/manager/dto.js";
 import {
-  taskRunInteractionResponse as taskRunInteractionResponse,
   taskRunError,
+  taskRunInteractionResponse,
   taskRunOutput,
 } from "@/tasks/manager/helpers.js";
 import { TaskManager } from "@/tasks/manager/manager.js";
+import { AbortError, AbortScope } from "@/utils/abort-scope.js";
 import { Logger } from "beeai-framework";
 import { BeeAgent } from "beeai-framework/agents/bee/agent";
-import { RuntimeOutput } from "./dto.js";
 
 export const RUNTIME_USER = "runtime_user";
 export type RuntimeOutputMethod = (output: RuntimeOutput) => Promise<void>;
@@ -18,10 +19,10 @@ export type RuntimeOutputMethod = (output: RuntimeOutput) => Promise<void>;
 export interface RuntimeConfig {
   pollingIntervalMs: number;
   timeoutMs: number;
-
   agentRegistry: AgentRegistry<unknown>;
   taskManager: TaskManager;
   supervisor: AgentWithInstance<BeeAgent>;
+  logger: Logger;
 }
 
 export class Runtime {
@@ -34,6 +35,7 @@ export class Runtime {
   private taskManager: TaskManager;
   private supervisor: AgentWithInstance<BeeAgent>;
   private _isRunning = false;
+  private abortScope: AbortScope;
 
   get isRunning() {
     return this._isRunning;
@@ -45,14 +47,18 @@ export class Runtime {
     supervisor,
     pollingIntervalMs,
     timeoutMs,
+    logger,
   }: RuntimeConfig) {
-    this.logger = Logger.root.child({ name: this.constructor.name });
+    this.logger = logger.child({
+      name: this.constructor.name,
+    });
 
     this.agentRegistry = agentRegistry;
     this.pollingIntervalMs = pollingIntervalMs;
     this.timeoutMs = timeoutMs;
     this.taskManager = taskManager;
     this.supervisor = supervisor;
+    this.abortScope = new AbortScope();
 
     this.taskManager.addAdmin(RUNTIME_USER);
   }
@@ -62,6 +68,7 @@ export class Runtime {
     if (this._isRunning) {
       throw new Error(`Runtime is already running`);
     }
+
     try {
       this._isRunning = true;
       this.logger.info("Starting runtime process...");
@@ -69,14 +76,18 @@ export class Runtime {
       this.logger.info("Process completed successfully");
       return response;
     } catch (error) {
-      this.logger.error(error, "Error in runtime process:");
+      if (error instanceof AbortError) {
+        this.logger.info("Runtime process aborted");
+      } else {
+        this.logger.error(error, "Error in runtime process:");
+      }
       throw error;
     } finally {
       this._isRunning = false;
     }
   }
 
-  async waitUntilTaskRunFinish(...args: Parameters<typeof this.run>) {
+  private async waitUntilTaskRunFinish(...args: Parameters<typeof this.run>) {
     const [input, outputMethod] = args;
     const start = new Date();
     const timeout = new Date(start.getTime() + this.timeoutMs);
@@ -98,6 +109,7 @@ export class Runtime {
     };
 
     const onTaskRunStart = (taskRun: TaskRun) => {
+      this.logger.debug({ taskRunId: taskRun.taskRunId }, "Task run started");
       outputMethod({
         kind: "progress",
         taskRun,
@@ -107,6 +119,10 @@ export class Runtime {
     this.taskManager.on("task_run:start", onTaskRunStart);
 
     const onTaskRunTrajectoryUpdate = (taskRun: TaskRun) => {
+      this.logger.debug(
+        { taskRunId: taskRun.taskRunId },
+        "Task run trajectory updated",
+      );
       outputMethod({
         kind: "progress",
         taskRun,
@@ -119,6 +135,7 @@ export class Runtime {
     );
 
     const onTaskRunError = (taskRun: TaskRun) => {
+      this.logger.debug({ taskRunId: taskRun.taskRunId }, "Task run failed");
       const agent = getAgent(taskRun);
       outputMethod({
         kind: "progress",
@@ -130,6 +147,7 @@ export class Runtime {
     this.taskManager.on("task_run:error", onTaskRunError);
 
     const onTaskRunComplete = (taskRun: TaskRun) => {
+      this.logger.debug({ taskRunId: taskRun.taskRunId }, "Task run completed");
       const agent = getAgent(taskRun);
       outputMethod({
         kind: "progress",
@@ -143,6 +161,8 @@ export class Runtime {
     try {
       let taskRunId;
       while (true) {
+        this.logger.debug(`waiting...`);
+
         if (!taskRunId) {
           const taskRun = this.taskManager.createTaskRun(
             "supervisor",
@@ -177,6 +197,12 @@ export class Runtime {
             `There are ${unfinished.length} unfinished task. Closing loop.`,
           );
           const taskRun = this.taskManager.getTaskRun(taskRunId, RUNTIME_USER);
+          if (taskRun.status === "ABORTED") {
+            return `Task was aborted`;
+          } else if (taskRun.status === "FAILED") {
+            return `Task was failed`;
+          }
+
           const response = taskRunInteractionResponse(taskRun);
           outputMethod({
             kind: "final",
@@ -190,15 +216,22 @@ export class Runtime {
             `There are ${unfinished.length} unfinished tasks. Keeping loop...`,
           );
         }
-        // Wait for the polling interval before checking again
-        await new Promise((resolve) =>
-          setTimeout(resolve, this.pollingIntervalMs),
-        );
+
+        //Sleep for polling
+        await this.abortScope.sleep(this.pollingIntervalMs);
       }
+    } catch (err) {
+      this.logger.error(err);
+      throw err;
     } finally {
+      this.abortScope.reset();
       this.taskManager.off("task_run:start", onTaskRunStart);
       this.taskManager.off("task_run:error", onTaskRunError);
       this.taskManager.off("task_run:complete", onTaskRunComplete);
+      this.taskManager.off(
+        "task_run:trajectory_update",
+        onTaskRunTrajectoryUpdate,
+      );
     }
   }
 }

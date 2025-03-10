@@ -16,6 +16,7 @@ import { AgentFactory } from "../agents/agent-factory.js";
 import { BaseAgentFactory } from "../agents/base/agent-factory.js";
 import { operator, supervisor } from "../agents/index.js";
 import { Runtime } from "./runtime.js";
+import { Logger } from "beeai-framework";
 
 export interface Switches {
   taskManager?: TaskManagerSwitches;
@@ -28,6 +29,8 @@ export interface CreateRuntimeConfig {
   workspace?: string;
   switches?: Switches;
   outputDirPath?: string;
+  signal?: AbortSignal;
+  logger: Logger;
 }
 
 export async function createRuntime({
@@ -36,13 +39,17 @@ export async function createRuntime({
   workspace,
   switches,
   outputDirPath,
+  signal,
+  logger,
 }: CreateRuntimeConfig): Promise<Runtime> {
   // Reset audit logs
   AgentStateLogger.init(outputDirPath);
   TaskStateLogger.init(outputDirPath);
 
   // Setup workspace
-  WorkspaceManager.init(workspace ?? "default", outputDirPath);
+  WorkspaceManager.init(workspace ?? "default", logger, {
+    dirPath: outputDirPath,
+  });
 
   let _agentFactory = agentFactory;
   if (_agentFactory == null) {
@@ -100,6 +107,7 @@ export async function createRuntime({
         availableCount,
       );
     },
+    logger,
   });
 
   const taskManager = new TaskManager({
@@ -122,7 +130,7 @@ export async function createRuntime({
           taskRun.config.agentType,
         );
       } catch (err) {
-        console.error(err);
+        logger.error(err);
         onAwaitingAgentAcquired(taskRun.taskRunId, taskManager);
         return;
       }
@@ -132,15 +140,20 @@ export async function createRuntime({
       const prompt = taskRun.taskRunInput;
 
       _agentFactory
-        .runAgent(instance, prompt, (key, value) => {
-          onAgentUpdate(
-            key,
-            value,
-            taskRun.taskRunId,
-            agent.agentId,
-            taskManager,
-          );
-        })
+        .runAgent(
+          instance,
+          prompt,
+          (key, value) => {
+            onAgentUpdate(
+              key,
+              value,
+              taskRun.taskRunId,
+              agent.agentId,
+              taskManager,
+            );
+          },
+          signal,
+        )
         .then((resp) =>
           onAgentComplete(resp, taskRun.taskRunId, agent.agentId, taskManager),
         )
@@ -151,6 +164,8 @@ export async function createRuntime({
           registry.releaseAgent(agent.agentId);
         });
     },
+    signal,
+    logger,
   });
 
   await registry.registerToolsFactories([
@@ -160,9 +175,10 @@ export async function createRuntime({
         registry,
         taskManager,
         supervisor.Workdir.getWorkdirPath().validPath,
+        logger,
       ),
     ],
-    ["operator", new operator.ToolsFactory()],
+    ["operator", new operator.ToolsFactory(logger)],
   ]);
 
   registry.restore();
@@ -243,5 +259,6 @@ export async function createRuntime({
     pollingIntervalMs: 3000,
     supervisor: agent as AgentWithInstance<BeeAgent>,
     timeoutMs: 15 * 60_000, // 15 min
+    logger,
   });
 }

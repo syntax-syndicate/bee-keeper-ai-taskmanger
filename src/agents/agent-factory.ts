@@ -71,8 +71,9 @@ export class AgentFactory extends BaseAgentFactory<BeeAgent> {
     agent: BeeAgent,
     prompt: string,
     onUpdate: (key: string, value: string) => void,
+    signal?: AbortSignal,
   ): Promise<string> {
-    const resp = await agent.run({ prompt }).observe((emitter) => {
+    const resp = await agent.run({ prompt }, { signal }).observe((emitter) => {
       emitter.on("update", async ({ update }) => {
         onUpdate(update.key, update.value);
       });

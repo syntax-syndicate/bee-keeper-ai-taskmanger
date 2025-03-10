@@ -1,4 +1,5 @@
-import { validatePath } from "@/utils/file.js";
+import { AbortScope } from "@/utils/abort-scope.js";
+import { ensureDirectoryExistsSafe, validatePath } from "@/utils/file.js";
 import { Logger } from "beeai-framework";
 import EventEmitter from "events";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
@@ -44,14 +45,22 @@ export class WorkspaceManager extends EventEmitter {
   private _workspaceName?: string;
   private _workspacePath?: string;
   private resources = new Map<DirPath, WorkspaceResource>();
+  private abortScope: AbortScope;
 
-  static init(workspace: string, dirPath?: string) {
+  static init(
+    workspace: string,
+    logger: Logger,
+    options?: { dirPath?: string; signal?: AbortSignal },
+  ) {
     if (this.instance) {
       throw new Error(`Workspace manager is already initialized`);
     }
-    this.instance = new WorkspaceManager();
+    this.instance = new WorkspaceManager(logger, options?.signal);
 
-    const workspacesDirPath = join(dirPath ?? process.cwd(), ...DEFAULT_PATH);
+    const workspacesDirPath = join(
+      options?.dirPath ?? process.cwd(),
+      ...DEFAULT_PATH,
+    );
 
     this.instance.setWorkspaceDirPath(workspacesDirPath);
     this.instance.setWorkspace(workspace);
@@ -97,23 +106,10 @@ export class WorkspaceManager extends EventEmitter {
     this._workspacesDirPath = dirPath;
   }
 
-  private constructor() {
+  private constructor(logger: Logger, signal?: AbortSignal) {
     super();
-    this.logger = Logger.root.child({ name: "WorkspaceManager" });
-  }
-
-  private ensureDirectoryExists(dirPath: string) {
-    const validDirPath = validatePath(this.workspacesDirPath, dirPath);
-
-    try {
-      if (!existsSync(validDirPath)) {
-        mkdirSync(validDirPath, { recursive: true });
-        this.logger.info(`Created directory: ${dirPath}`);
-      }
-    } catch (error) {
-      this.logger.error(`Error creating directory: ${dirPath}`);
-      throw error;
-    }
+    this.logger = logger.child({ name: "WorkspaceManager" });
+    this.abortScope = new AbortScope({ parentSignal: signal });
   }
 
   public on<K extends keyof WorkspaceManagerEvents>(
@@ -136,7 +132,11 @@ export class WorkspaceManager extends EventEmitter {
       this.workspacesDirPath,
       workspaceNameSanitized,
     );
-    this.ensureDirectoryExists(workspacePathSanitized);
+    ensureDirectoryExistsSafe(
+      this.workspacesDirPath,
+      workspacePathSanitized,
+      this.logger,
+    );
     this._workspaceName = workspaceNameSanitized;
     this._workspacePath = workspacePathSanitized;
   }
@@ -145,6 +145,8 @@ export class WorkspaceManager extends EventEmitter {
     input: CreateFileResourceInput | CreateDirectoryResourceInput,
     ownerId: string,
   ): WorkspaceResource {
+    this.abortScope.checkIsAborted();
+
     const { inputJoinedPath, validPath } = this.getWorkspacePath(input);
     const name = basename(validPath);
 
@@ -214,7 +216,12 @@ export class WorkspaceManager extends EventEmitter {
     resourcePath: string,
     ownerId: string,
     onLine: (resource: WorkspaceResource, content: string) => void,
+    signal?: AbortSignal,
   ): void {
+    if (signal?.aborted) {
+      return;
+    }
+
     // Check if resource exists in our tracking
     const resource = this.resources.get(resourcePath);
     if (!resource) {
@@ -244,6 +251,9 @@ export class WorkspaceManager extends EventEmitter {
       // Split content into lines and process each line
       const lines = content.split(/\r?\n/);
       for (const line of lines) {
+        if (signal?.aborted) {
+          return;
+        }
         onLine(resource, line);
       }
 
@@ -265,7 +275,12 @@ export class WorkspaceManager extends EventEmitter {
     resourcePath: string,
     resourceOwnerId: string,
     content: string,
+    signal?: AbortSignal,
   ): void {
+    if (signal?.aborted) {
+      return;
+    }
+
     // Check if resource exists in our tracking
     const resource = this.resources.get(resourcePath);
     if (!resource) {
@@ -289,6 +304,10 @@ export class WorkspaceManager extends EventEmitter {
       writeFileSync(resource.path, content, "utf8");
 
       this.logger.info(`Successfully wrote to file: ${resourcePath}`);
+
+      if (signal?.aborted) {
+        return;
+      }
 
       // Emit change event with the updated resource
       this.emit("workspace:change", clone(resource));

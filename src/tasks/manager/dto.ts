@@ -125,6 +125,7 @@ export type TaskConfigOwnedResource = z.infer<
 >;
 
 export const TaskRunTerminalStatusEnumSchema = z.enum([
+  "ABORTED",
   "STOPPED",
   "FAILED",
   "COMPLETED",
@@ -188,6 +189,7 @@ export const TaskRunStatusEnumSchema = z.enum([
   "EXECUTING",
   "PENDING",
   "AWAITING_AGENT",
+  "ABORTED",
   "STOPPED",
   "FAILED",
   "COMPLETED",
@@ -339,10 +341,10 @@ export const TaskConfigPoolStatsSchema = z
   .object({
     poolSize: z.number(),
     created: z.number(),
+    aborted: z.number(),
     terminated: z.number(),
     completed: z.number(),
     running: z.number(),
-
     pending: z.number(),
     awaiting_agent: z.number(),
     stopped: z.number(),
@@ -370,6 +372,7 @@ const TERMINATION_STATUSES = [
   TaskRunStatusEnumSchema.enum.STOPPED,
   TaskRunStatusEnumSchema.enum.FAILED,
   TaskRunStatusEnumSchema.enum.COMPLETED,
+  TaskRunStatusEnumSchema.enum.ABORTED,
 ] as const;
 type TerminationStatus = (typeof TERMINATION_STATUSES)[number];
 
@@ -377,6 +380,16 @@ export const isTaskRunTerminationStatus = (
   status: TaskRunStatusEnum,
 ): status is TerminationStatus =>
   TERMINATION_STATUSES.includes(status as TerminationStatus);
+
+const ERROR_STATUSES = [
+  TaskRunStatusEnumSchema.enum.FAILED,
+  TaskRunStatusEnumSchema.enum.ABORTED,
+] as const;
+type ErrorStatus = (typeof ERROR_STATUSES)[number];
+
+export const isTaskRunErrorStatus = (
+  status: TaskRunStatusEnum,
+): status is ErrorStatus => ERROR_STATUSES.includes(status as ErrorStatus);
 
 export const ActingAgentIdValueSchema = AgentIdValueSchema.describe(
   "ID of the agent performing this operation.",
