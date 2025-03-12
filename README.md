@@ -13,11 +13,6 @@
   - [Development setup](#development-setup)
     - [Installation](#installation)
   - [Platform Architecture](#platform-architecture)
-    - [Supervisor-Driven Workflow](#supervisor-driven-workflow)
-    - [Workspace Persistence](#workspace-persistence)
-  - [Monitor UI](#monitor-ui)
-    - [Agent Monitor](#agent-monitor)
-    - [Task Monitor](#task-monitor)
   - [Platform Operation Modes](#platform-operation-modes)
     - [Interactive Mode](#interactive-mode)
     - [Autonomous Mode](#autonomous-mode)
@@ -66,10 +61,10 @@ The platform can be operated in two distinct modes:
 
 ### Interactive Mode
 
-In this mode, you engage in an ongoing conversation with the Supervisor:
+In this mode, you engage in an ongoing conversation with the Supervisor in Chat UI:
 
 ```bash
-mise supervisor -c -w default
+mise supervisor:chat
 ```
 
 This command starts the platform in interactive mode where you can:

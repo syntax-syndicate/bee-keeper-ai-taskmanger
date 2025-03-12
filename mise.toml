@@ -21,6 +21,9 @@ depends = ["*:build"]
 [tasks."supervisor"]
 depends = ["*:start"]
 
+[tasks."supervisor:chat"]
+depends = ["*:start-chat"]
+
 [tasks."monitor"]
 depends = ["*:monitor"]
 
@@ -131,6 +134,10 @@ outputs = ["dist/**/*"]
 [tasks."code:start"]
 depends = ["code:build"]
 run = "pnpm start"
+
+[tasks."code:start-chat"]
+depends = ["code:build"]
+run = "pnpm start -c -w default"
 
 ### monitor
 
