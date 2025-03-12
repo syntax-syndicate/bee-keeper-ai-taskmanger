@@ -12,8 +12,8 @@
   - [Overview](#overview)
   - [Development setup](#development-setup)
     - [Installation](#installation)
-  - [Platform Architecture](#platform-architecture)
-  - [Platform Operation Modes](#platform-operation-modes)
+  - [Architecture](#architecture)
+  - [Operation Modes](#operation-modes)
     - [Interactive Mode](#interactive-mode)
     - [Autonomous Mode](#autonomous-mode)
   - [Key Benefits](#key-benefits)
@@ -21,9 +21,9 @@
 
 ## Overview
 
-BeeAI Supervisor is a multi-agent AI platform designed to orchestrate specialized AI agents for completing complex tasks. While the name might suggest a single agent, it actually refers to the entire system - a comprehensive platform that includes a Supervisor Agent at its core which serves as your primary interface, helping to configure, manage, and coordinate other specialized agents.
+BeeAI Supervisor is a multi-agent AI system designed to orchestrate specialized AI agents for completing complex tasks. While the name might suggest a single agent, it actually refers to the entire system - a comprehensive runtime that includes a Supervisor Agent at its core which serves as your primary interface, helping to configure, manage, and coordinate other specialized agents.
 
-Think of BeeAI Supervisor as a hive of AI agents, with the Supervisor agent acting as the queen bee, orchestrating the activities of worker agents to efficiently accomplish your goals. This platform enables you to harness the collective intelligence of multiple specialized agents through a single, coordinated interface.
+Think of BeeAI Supervisor as a hive of AI agents, with the Supervisor agent acting as the queen bee, orchestrating the activities of worker agents to efficiently accomplish your goals. This system enables you to harness the collective intelligence of multiple specialized agents through a single, coordinated interface.
 
 ## Development setup
 
@@ -52,12 +52,12 @@ After setup, you can use:
 > - Fish: `mise activate fish | source` (add to `~/.config/fish/config.fish` to make permanent)
 > - Other shells: [documentation](https://mise.jdx.dev/installing-mise.html#shells)
 
-## Platform Architecture
+## Architecture
 [Full documentation](https://cheerful-sodalite-38a.notion.site/BeeAI-Supervisor-1ab3b270a700801cabadc0eb80ae9ddb)
 
-## Platform Operation Modes
+## Operation Modes
 
-The platform can be operated in two distinct modes:
+The system can be operated in two distinct modes:
 
 ### Interactive Mode
 
