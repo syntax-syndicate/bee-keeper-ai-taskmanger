@@ -58,98 +58,7 @@ After setup, you can use:
 > - Other shells: [documentation](https://mise.jdx.dev/installing-mise.html#shells)
 
 ## Platform Architecture
-
-### Supervisor-Driven Workflow
-
-The platform is designed for interactive development through conversation with the Supervisor Agent. This allows you to:
-
-- Iteratively develop the best configuration of agents and tasks
-- Define specialized agents for specific types of work
-- Create task templates that can be instantiated with specific inputs
-- Coordinate complex workflows through intelligent task orchestration
-
-### Workspace Persistence
-
-All your work with the platform is automatically persisted in workspaces:
-
-- The default workspace is located at `./output/workspaces/default`
-- Agent and task configurations are stored in the `configs` folder
-- Multiple workspaces can be maintained for different projects or purposes
-
-## Monitor UI
-
-The platform includes a monitoring interface with two main views:
-
-### Agent Monitor
-
-The Agent Monitor displays:
-
-- **Agent Pools**: List of all agent configurations organized by type (supervisor/operator) and name
-  - Each entry shows active/total agents (e.g., `researcher [3/11]`)
-  - Clicking on an agent pool displays its details and versions
-
-- **Agent Versions**: When an agent pool is selected, shows all versions of that agent
-  - Each entry shows active/total agents for that version (e.g., `v2 [2/10]`)
-  - Multiple versions allow for graceful updates and testing
-
-- **Agent Instances**: When a version is selected, displays all running instances
-  - Each entry shows the specific agent ID (e.g., `researcher [1] v2`)
-  - Clicking an agent instance reveals its detailed status
-
-Example hierarchy:
-```
-Agent Pools:
-├── supervisor
-│   └── boss [1/1]
-└── operator
-    └── researcher [3/11]  <-- Selected
-
-Agent Versions:
-├── v2 [2/10]  <-- Selected
-└── v1 [1/1]
-
-Agent Instances:
-├── researcher [1] v2
-└── researcher [2] v2
-```
-
-### Task Monitor
-
-The Task Monitor provides visibility into task configurations and running task instances throughout the platform:
-
-- **Task Configs**: List of all task configurations organized by type
-  - Each entry shows the task type name (e.g., `poem_generation`)
-  - Clicking on a task config displays its details and runs
-
-- **Task Runs**: When a task config is selected, shows all running and completed instances
-  - Each entry shows the specific task run ID (e.g., `task:poem_generation[3]:1`)
-  - Status indicators show whether tasks are pending, in-progress, completed, or failed
-  - Includes information about which agent is assigned to each task run
-
-- **Task Details**: When a task run is selected, displays detailed information including:
-  - Input parameters and their values
-  - Current status and execution time
-  - Output results (for completed tasks)
-  - Associated agent information
-
-Example hierarchy:
-```
-Task Configs:
-├── poem_generation  <-- Selected
-├── text_summarization
-└── research_query
-
-Task Runs:
-├── task:poem_generation[3]:1  <-- Selected
-├── task:poem_generation[2]:1 (Completed)
-└── task:poem_generation[1]:1 (Completed)
-
-Task Details:
-├── Input: "sunset over mountains"
-├── Status: In Progress
-├── Assigned to: operator:poem_generator[2]:3
-└── Execution time: 00:01:23
-```
+[Full documentation](https://cheerful-sodalite-38a.notion.site/BeeAI-Supervisor-1ab3b270a700801cabadc0eb80ae9ddb)
 
 ## Platform Operation Modes
 
@@ -160,7 +69,7 @@ The platform can be operated in two distinct modes:
 In this mode, you engage in an ongoing conversation with the Supervisor:
 
 ```bash
-mise supervisor
+mise supervisor -c
 ```
 
 This command starts the platform in interactive mode where you can:
