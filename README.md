@@ -69,7 +69,7 @@ The platform can be operated in two distinct modes:
 In this mode, you engage in an ongoing conversation with the Supervisor:
 
 ```bash
-mise supervisor -c
+mise supervisor -c -w default
 ```
 
 This command starts the platform in interactive mode where you can:
