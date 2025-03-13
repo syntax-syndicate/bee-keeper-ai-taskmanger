@@ -52,7 +52,7 @@ After setup, you can use:
 > - Fish: `mise activate fish | source` (add to `~/.config/fish/config.fish` to make permanent)
 > - Other shells: [documentation](https://mise.jdx.dev/installing-mise.html#shells)
 
-## Architecture
+## Documentation
 [Full documentation](https://cheerful-sodalite-38a.notion.site/BeeAI-Supervisor-1ab3b270a700801cabadc0eb80ae9ddb)
 
 ## Operation Modes
