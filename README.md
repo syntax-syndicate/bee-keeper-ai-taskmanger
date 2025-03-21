@@ -21,6 +21,9 @@
 
 ## Overview
 
+[🌅 Quick Intro - beeai-supervisor.pdf](https://github.com/user-attachments/files/19391229/beeai-supervisor-v01.pdf)
+
+
 BeeAI Supervisor is a multi-agent AI system designed to orchestrate specialized AI agents for completing complex tasks. While the name might suggest a single agent, it actually refers to the entire system - a comprehensive runtime that includes a Supervisor Agent at its core which serves as your primary interface, helping to configure, manage, and coordinate other specialized agents.
 
 Think of BeeAI Supervisor as a hive of AI agents, with the Supervisor agent acting as the queen bee, orchestrating the activities of worker agents to efficiently accomplish your goals. This system enables you to harness the collective intelligence of multiple specialized agents through a single, coordinated interface.
