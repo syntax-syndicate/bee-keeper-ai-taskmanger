@@ -22,6 +22,7 @@
 ## Overview
 
 [🌅 Quick Intro - beeai-supervisor.pdf](https://github.com/user-attachments/files/19391229/beeai-supervisor-v01.pdf)
+[📚 Full documentation](https://cheerful-sodalite-38a.notion.site/BeeAI-Supervisor-1ab3b270a700801cabadc0eb80ae9ddb)
 
 
 BeeAI Supervisor is a multi-agent AI system designed to orchestrate specialized AI agents for completing complex tasks. While the name might suggest a single agent, it actually refers to the entire system - a comprehensive runtime that includes a Supervisor Agent at its core which serves as your primary interface, helping to configure, manage, and coordinate other specialized agents.
@@ -54,9 +55,6 @@ After setup, you can use:
 > - Zsh: `eval "$(mise activate zsh)"` (add to `~/.zshrc` to make permanent)
 > - Fish: `mise activate fish | source` (add to `~/.config/fish/config.fish` to make permanent)
 > - Other shells: [documentation](https://mise.jdx.dev/installing-mise.html#shells)
-
-## Documentation
-[Full documentation](https://cheerful-sodalite-38a.notion.site/BeeAI-Supervisor-1ab3b270a700801cabadc0eb80ae9ddb)
 
 ## Operation Modes
 
