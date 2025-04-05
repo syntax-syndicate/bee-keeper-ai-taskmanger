@@ -1,48 +1,58 @@
-![cover](https://github.com/user-attachments/assets/8e61bb06-7548-4d57-9d00-897c6f4da414)
+<div align="center">
 
-# ![Bee simplest circle](https://github.com/user-attachments/assets/fea01c9c-662e-4349-8047-5a787f105909) BeeAI Supervisor
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/beekeeper-dark.png">
+    <source media="(prefers-color-scheme: light)" srcset="docs/assets/beekeeper-light.png">
+    <img alt="Beekeeper" width="30%">
+  </picture>
+</p>
 
-> [!WARNING]
-> [PRE-Alpha] This repository contains the beeai supervisor which is still under a rapid development. Please treat it as
-> highly experimental and expect breaking changes often. Reach out on discord if you'd like to contribute or get 
-> involved in the discussions: [join discord](https://discord.gg/AZFrp3UF5k)
+**Orchestrate multi-agent systems with centralized supervision and automatic agent creation**
 
+![Alpha](https://img.shields.io/badge/Status-Alpha-red?style=plastic)
+[![Apache 2.0](https://img.shields.io/badge/Apache%202.0-License-EA7826?style=plastic&logo=apache&logoColor=white)](https://github.com/i-am-bee/beeai-framework?tab=Apache-2.0-1-ov-file#readme)
+[![Follow on Bluesky](https://img.shields.io/badge/Follow%20on%20Bluesky-0285FF?style=plastic&logo=bluesky&logoColor=white)](https://bsky.app/profile/beeaiagents.bsky.social)
+[![Join our Discord](https://img.shields.io/badge/Join%20our%20Discord-7289DA?style=plastic&logo=discord&logoColor=white)](https://discord.com/invite/NradeA6ZNF)
+[![LF AI & Data](https://img.shields.io/badge/LF%20AI%20%26%20Data-0072C6?style=plastic&logo=linuxfoundation&logoColor=white)](https://lfaidata.foundation/projects/)
 
-## Table of Contents
-- [ BeeAI Supervisor](#-beeai-supervisor)
-  - [Table of Contents](#table-of-contents)
-  - [🧭 Overview](#-overview)
-  - [🧑‍🏫 Getting started](#-getting-started)
-    - [🛠️ Installation](#️-installation)
-    - [🏡 Environment setup](#-environment-setup)
-  - [🎛️ Operation Modes](#️-operation-modes)
-    - [💬 Interactive Mode](#-interactive-mode)
-    - [🤖 Autonomous Mode](#-autonomous-mode)
-  - [🖥️ Monitor](#️-monitor)
-  - [📤 Workspaces](#-workspaces)
-  - [🎪 Showcase](#-showcase)
-    - [⚙️ Specification](#️-specification)
-  - [🏁 Conclusion](#-conclusion)
-    - [🚀 Key Benefits](#-key-benefits)
-    - [💡 Best Practices](#-best-practices)
+[Overview](#overview) - [Key Features](#key-features) - [Installation](#installation) - [Quick start](#quick-start) - [Interaction Modes](#interaction-modes) - [Workspaces](#workspaces)
 
-## 🧭 Overview
+</div>
 
-[🌅 Quick Intro - beeai-supervisor.pdf](https://github.com/user-attachments/files/19391229/beeai-supervisor-v01.pdf)
-[📚 Full documentation](https://cheerful-sodalite-38a.notion.site/BeeAI-Supervisor-1ab3b270a700801cabadc0eb80ae9ddb)
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/beekeeper-diagram.jpg">
+    <source media="(prefers-color-scheme: light)" srcset="docs/assets/beekeeper-diagram.jpg">
+    <img alt="Beekeeper" width="100%">
+  </picture>
+</p>
 
+## Overview
 
-BeeAI Supervisor is a multi-agent AI system designed to orchestrate specialized AI agents for completing complex tasks. While the name might suggest a single agent, it actually refers to the entire system - a comprehensive runtime that includes a Supervisor Agent at its core which serves as your primary interface, helping to configure, manage, and coordinate other specialized agents.
+Beekeeper is an experimental multi-agent system, built on the [BeeAI framework](https://github.com/i-am-bee/beeai-framework), designed to coordinate specialized AI agents for complex tasks. At its core, a central supervisor agent acts as your primary interface, simplifying the setup and management of specialized agents. Instead of manually configuring each agent, you define your objectives, and the supervisor handles the rest.
 
-Think of BeeAI Supervisor as a hive of AI agents, with the Supervisor agent acting as the queen bee, orchestrating the activities of worker agents to efficiently accomplish your goals. This system enables you to harness the collective intelligence of multiple specialized agents through a single, coordinated interface.
+### Core components
+1. **Supervision:** A central supervisor agent oversees and coordinates multiple AI agents.
+2. **Agent registry:** A centralized repository of available agents.
+3. **Task management:** Manages and executes complex tasks, breaking them down into smaller sub-tasks.
 
-## 🧑‍🏫 Getting started
+These components enable seamless task management by coordinating specialized AI agents through an intuitive, conversational interface with the supervisor agent.
 
+## Key features
 
-### 🛠️ Installation
-This project uses [Mise-en-place](https://mise.jdx.dev/) as a manager of tool versions (`python`, `uv`, `nodejs`, `pnpm` etc.), as well as a task runner and environment manager. Mise will download all the needed tools automatically -- you don't need to install them yourself.
+- 🔄 **Iterative development**: Continuously refine agents and tasks by giving feedback to the supervisor agent.
+- 📁 **Workspace persistence**: Save and reuse configurations for efficiency and consistency.
+- 🚀 **Parallel scalability**: Run multiple agents simultaneously for complex tasks.
+- 🖥️ **Unified interface**: Manage all AI agents from one central hub.
+- 📡 **Active monitoring**: Get real-time insights to detect and fix issues quickly.
 
-Clone this project, then run these setup steps:
+---
+
+## Installation
+[Mise-en-place](https://mise.jdx.dev/) is used to manage tool versions (`python`, `uv`, `nodejs`, `pnpm`...), run tasks, and handle environments, automatically downloading required tools.
+
+Clone the project, then run:
 
 ```sh
 brew install mise  # more ways to install: https://mise.jdx.dev/installing-mise.html
@@ -51,132 +61,149 @@ mise install
 mise build
 ```
 
-### 🏡 Environment setup
-Mise automatically creates a `.env` file based on the `.env.template` found in the project root. You must select one of the available LLM providers (`ibm_rits`, `ollama`, or `openai`) and set up its corresponding API key. 
+### Environment setup
 
-For example, if you choose OpenAI, your `.env` file might look like this:
+Mise generates a `.env` file using the `.env.template` in the project root. 
 
-```bash
-# LLM Provider (ibm_rits/ollama/openai)
+**1. Set your LLM provider**
+
+<details>
+  <summary>OpenAI (Recommended)</summary>
+
+```
+# LLM Provider (ollama/openai)
 LLM_BACKEND="openai"
-
-  :
-  :
 
 ## OpenAI
 OPENAI_API_KEY="<YOUR_OPEN_AI_API_KEY_HERE>"
 OPENAI_MODEL_SUPERVISOR="gpt-4o"
 OPENAI_MODEL_OPERATOR="gpt-4o"
 ```
+</details>
 
-> [!WARNING]
-> **Ollama**
-> 
-> If you choose the Ollama backend, ensure that all models you plan to use support tool calling. Using a small model can lead to many incorrect tool calls from the supervisor agent. For stable performance, we recommend a large model such as `qwq:32b`.
+<details>
+  <summary>Ollama</summary>
 
+```
+# LLM Provider (ollama/openai)
+LLM_BACKEND="openai"
 
+## Ollama
+OLLAMA_HOST="http://0.0.0.0:11434"
+OLLAMA_MODEL_SUPERVISOR="deepseek-r1:8b"
+OLLAMA_MODEL_OPERATOR="deepseek-r1:8b"
+```
 
-## 🎛️ Operation Modes
+> Important Note: When using **Ollama**, ensure your model supports tool calling. Smaller models may lead to frequent incorrect tool calls. For stability, use a larger model like `qwq:32b`.
 
-The system can be operated in two distinct modes: **interactive** and **autonomous**.
+</details>
 
-### 💬 Interactive Mode
+**2. Set your search tool**
 
-![chat](https://github.com/user-attachments/assets/eb8ad753-d89e-4e02-959f-c7c458a4ddb4)
+<details>
+  <summary>Tavily (Recommended)</summary>
 
-In this mode, you engage in an ongoing conversation with the Supervisor in Chat UI:
+Tavily offers 1,000 free API credits/month without a credit card. Get your API key from [Tavily Quickstart](https://docs.tavily.com/documentation/quickstart).
 
+```
+# Tools
+SEARCH_TOOL="tavily"
+TAVILY_API_KEY="<YOUR_TAVILY_API_KEY_HERE>"
+```
+
+</details>
+
+<details>
+  <summary>DuckDuckGo</summary>
+
+```
+# Tools
+SEARCH_TOOL="duckduckgo"
+```
+</details>
+
+---
+
+## Quick start
+
+| Step | Action                                           | Explanation                                                                                      |
+|------|--------------------------------------------------|--------------------------------------------------------------------------------------------------|
+| **1** | Run:<br> `WORKSPACE=trip_planner mise interactive`  | Run this command to start the interactive mode of the `mise` tool. This will allow you to input prompts easily and save your work in `output/workspaces/trip_planner`. |
+| **2** | Split the terminal, then run:<br> `mise monitor`  | View a live activity feed of the platform's tasks and agents. |
+| **3** | Input the following prompt: <br> `I'm planning a trip to Boston, MA next week and could use some help putting together an itinerary. I want to try the best food available in the city. I enjoy Seafood and Italian cuisine.` | Observe the supervisor agent create tasks and generate specialized agents (e.g., `itinerary_planner`, and `restaurant_researcher`). |
+| **4** | Modify an existing agent:<br> `Can you change the instructions of the restaurant researcher to only suggest restaurants that offer gluten free?` | Watch the supervisor agent update the instructions of the `restaurant_researcher`. |
+| **5** | Add more agents:<br> `I also want suggestions for the best hotels around the North End Boston.` | Observe the supervisor agent create an additional agent focused on accomodations. |
+| **6** | Now that you have all your agents set up, close out of the session (`esc` 2x, click yes) and start fresh:<br> `WORKSPACE=trip_planner mise interactive` | Revisit your multi-agent system at any time using this command. All tasks and agents are preserved in `output/workspaces/trip_planner`. |
+| **7** | Finally, engage all agents with a prompt: `I'm traveling to Boston MA next week for 3 days. I want some excellent restaurant recommendations and hotel suggestions.` | Notice all agent configurations are preserved, allowing you to build on your work. For example, there is no need to specify gluten-free restaurants since your restaurant agents configuration is preserved. |
+
+**You've just built your first multi-agent system with Beekeeper 👏**
+
+Now you're ready to iterate, expand, or even create something completely new!
+
+## Interaction modes
+
+The system operates in two modes: **Interactive** and **Autonomous**.
+
+---
+
+### Interactive mode
+
+Engage with the supervisor agent in real time via the Chat UI.
+
+To start, run:
 ```bash
 mise interactive
 ```
 
-This command starts the platform in interactive mode where you can:
-- **Start a Conversation**: Interact with the Supervisor Agent to describe your goals  
-- **Iterative Configuration**: Collaborate with the Supervisor to define appropriate agent and task configurations  
-- **Refine Your Approach**: Based on results, work with the Supervisor to improve your setup  
-- **Adjust On the Fly**: You can abort an ongoing task and refine the assignment through chat with the Supervisor
+Use this mode when you want to:
+- 🧭 Define goals - Get real-time guidance
+- 🎛️ Tune settings - Adjust agents and tasks as you go
+- 🛠️ Modify live — Pause, tweak, or stop tasks mid-run
 
-### 🤖 Autonomous Mode
+> [!TIP]
+> Monitor everything in another terminal: `mise monitor`.
 
-For one-off tasks or batch processing, you can run the platform in autonomous mode:
+> [!Important]
+> To avoid losing your work, always define a workspace: `WORKSPACE=trip_planner mise interactive`.
 
+### Autonomous mode
+
+Execute tasks independently, ideal for batch jobs or one-off requests.
+
+To start, run:
 ```bash
 mise autonomous <<< "Hi, can you create a poem about each of these topics: bee, hive, queen, sun, flowers?"
 ```
 
-This command runs the platform in autonomous mode where you can:
-- **One-Shot Requests**: Provide your instruction or data in a single command
-- **Hands-Off Processing**: The Supervisor Agent autonomously orchestrates the required agents and tasks  
-- **Focused Efficiency**: No ongoing conversation is required, letting the system complete your task in the background  
-- **Automatic Wrap-Up**: Once the request is fulfilled, results are returned and the platform shuts down
+In this mode:
+- ⚡ One command, one result
+- 👐 Zero interaction needed
+- 💤 Auto-shutdown after execution
 
-Autonomous mode is ideal for scripted operations, batch processing, or one-off requests that don’t require iterative development. Once your request is complete, results are returned, and the system automatically shuts down—no further input or interaction needed.
+> [!TIP]
+> Monitor everything in another terminal: `mise monitor`.
 
-## 🖥️ Monitor
+> [!Important]
+> To avoid losing your work, always define a workspace: `WORKSPACE=your_workspace mise autonomous <<< "your_prompt"`.
 
-![monitors](https://github.com/user-attachments/assets/ea8a8ca5-77ea-46f2-80b0-9afba7b99f69)
+---
 
-To monitor the process while in both modes, open another terminal window and run:
+## Workspaces
 
-```bash
-mise monitor
-```
+Workspaces provide a persistence layer for your agent and task configurations, optimizing resource use. With workspaces, you can:
+1.	Retain configurations across sessions, eliminating the need to rebuild setups.
+2.	Iterate and refine configurations for improved performance.
+3.	Ensure consistent processing while reducing token costs.
 
-This allows you to observe the platform's operations as it works on your request.
+Once fine-tuned, configurations can be easily reused, making workflows more efficient.
 
-## 📤 Workspaces
+### Workspace directory
 
-One of the main challenges in a multi-agent system is preventing the creation of unnecessary objects that can quickly consume resources. To address this, Workspaces provide a persistence layer for both agent and task configurations. This layer preserves configuration states across sessions and supports iterative refinement. Once you’ve fine-tuned a configuration to meet your needs, you can reuse it for new inputs—avoiding the expense of rebuilding complex structures, ensuring consistent processing quality, and optimizing token usage.
+Workspaces are stored in the `./outputs/workspaces` folder.
 
-Workspaces are located in `./outputs/workspaces` folder:
+### Creating or switching workspaces
 
-![workspaces](https://github.com/user-attachments/assets/4a238768-9978-4616-97bb-b97e1959dc44)
-
-You can create or switch a workspace by setting an environment variable like this:
+To create or switch to a different workspace, set the `WORKSPACE` variable when launching your session:
 ```bash
 WORKSPACE=my_workspace mise interactive
 ```
-
-## 🎪 Showcase
-
-[🎶 Creative Multi-Agent Tasks Showcase: Poetry and Hip-Hop Analysis](https://cheerful-sodalite-38a.notion.site/Creative-Multi-Agent-Tasks-Showcase-Poetry-and-Hip-Hop-Analysis-1b53b270a700800ab1d3eb28f825bd2a)
-
-The Poetry and Hip-Hop Analysis showcase demonstrates BeeAI Supervisor's sophisticated task orchestration capabilities. The system efficiently manages complex task dependencies, enabling parallel execution of multiple poem and song analyses while maintaining synchronization points where needed. Multiple agent instances work simultaneously on different aspects of the analysis, with the supervisor ensuring proper task sequencing and resource allocation.
-
-This showcase particularly highlights the system's ability to handle both parallel and sequential task flows, dynamically adjusting agent allocation based on task dependencies and availability. The supervisor maintains coherent coordination across multiple concurrent analysis streams while preventing resource conflicts and ensuring optimal throughput.
-
-### ⚙️ Specification
-
-- 🤹‍♂️ Interactive, 🤖 Autonomous, 🖼️ No-code
-- Used agents
-    - `boss` 1x  
-    *meta-llama/llama-3-1-405b-instruct-fp*
-    - `peom_generator` 4x
-    *meta-llama/llama-3-3-70b-instruct*
-    - `hip_hop_song_generator` 1x
-    *meta-llama/llama-3-3-70b-instruct*
-    - `poem_elements_highlighter` 1x
-    *meta-llama/llama-3-3-70b-instruct*
-- Executed tasks
-    - `process_input_and_plan` 1x
-    - `poem_generation` 4x
-    - `hip_hop_song_generation` 1x
-    - `poem_elements_highlighting` 1x
-
-
-## 🏁 Conclusion
-
-This platform combines the power of specialized AI agents with the flexibility of interactive configuration, all managed through natural conversation with the Supervisor Agent.
-
-### 🚀 Key Benefits
-- **Iterative Development**: Refine agents and tasks through ongoing dialogue with the Supervisor, ensuring continuous improvement.  
-- **Workspace Persistence**: Preserve and reuse configurations to save tokens and maintain consistent results across sessions.  
-- **Parallel Scalability**: Coordinate specialized agents to handle complex or high-volume operations efficiently.  
-- **Unified Interface**: Control all AI agents from a single entry point, simplifying orchestration.  
-- **Active Monitoring**: Gain real-time insights into platform operations to quickly identify and address bottlenecks.
-
-### 💡 Best Practices
-- **Incremental Approach**: Start with smaller tasks and gradually expand to more complex, multi-agent workflows.  
-- **Leverage Workspaces**: Reuse proven agent and task configurations to optimize resource usage and maintain quality.  
-- **Stay Observant**: Use the Monitor to track operations and make timely adjustments based on system feedback.  
-- **Document Configurations**: Keep a record of effective setups and methods for easier knowledge sharing and future reference.
