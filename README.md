@@ -16,7 +16,7 @@
 [![Join our Discord](https://img.shields.io/badge/Join%20our%20Discord-7289DA?style=plastic&logo=discord&logoColor=white)](https://discord.com/invite/NradeA6ZNF)
 [![LF AI & Data](https://img.shields.io/badge/LF%20AI%20%26%20Data-0072C6?style=plastic&logo=linuxfoundation&logoColor=white)](https://lfaidata.foundation/projects/)
 
-[Overview](#overview) - [Key Features](#key-features) - [Installation](#installation) - [Quick start](#quick-start) - [Interaction Modes](#interaction-modes) - [Workspaces](#workspaces)
+[Overview](#overview) - [Key Features](#key-features) - [Installation](#installation) - [Quickstart](#quickstart) - [Contribute](#contribute)
 
 </div>
 
@@ -124,14 +124,14 @@ SEARCH_TOOL="duckduckgo"
 
 ---
 
-## Quick start
+## Quickstart
 
 | Step | Action                                           | Explanation                                                                                      |
 |------|--------------------------------------------------|--------------------------------------------------------------------------------------------------|
 | **1** | Run:<br> `WORKSPACE=trip_planner mise interactive`  | Run this command to start the interactive mode of the `mise` tool. This will allow you to input prompts easily and save your work in `output/workspaces/trip_planner`. |
 | **2** | Split the terminal, then run:<br> `mise monitor`  | View a live activity feed of the platform's tasks and agents. |
-| **3** | Input the following prompt: <br> `I'm planning a trip to Boston, MA next week and could use some help putting together an itinerary. I want to try the best food available in the city. I enjoy Seafood and Italian cuisine.` | Observe the supervisor agent create tasks and generate specialized agents (e.g., `itinerary_planner`, and `restaurant_researcher`). |
-| **4** | Modify an existing agent:<br> `Can you change the instructions of the restaurant researcher to only suggest restaurants that offer gluten free?` | Watch the supervisor agent update the instructions of the `restaurant_researcher`. |
+| **3** | Input the following prompt: <br> `I'm heading to Boston next week and need help planning a simple 3-day itinerary. I’ll be staying in Back Bay and want to see historical sites, catch a hockey or basketball game, and enjoy great food. Can you recommend one dinner spot each night - Italian, Chinese, and French?` | Observe the supervisor agent create tasks and generate specialized agents. |
+| **4** | Modify an existing agent:<br> `Can you change the instructions of the restaurant agent to only suggest restaurants that offer gluten free?` | Watch the supervisor agent update the instructions of the `restaurant_researcher`. |
 | **5** | Add more agents:<br> `I also want suggestions for the best hotels around the North End Boston.` | Observe the supervisor agent create an additional agent focused on accomodations. |
 | **6** | Now that you have all your agents set up, close out of the session (`esc` 2x, click yes) and start fresh:<br> `WORKSPACE=trip_planner mise interactive` | Revisit your multi-agent system at any time using this command. All tasks and agents are preserved in `output/workspaces/trip_planner`. |
 | **7** | Finally, engage all agents with a prompt: `I'm traveling to Boston MA next week for 3 days. I want some excellent restaurant recommendations and hotel suggestions.` | Notice all agent configurations are preserved, allowing you to build on your work. For example, there is no need to specify gluten-free restaurants since your restaurant agents configuration is preserved. |
@@ -140,11 +140,11 @@ SEARCH_TOOL="duckduckgo"
 
 Now you're ready to iterate, expand, or even create something completely new!
 
+---
+
 ## Interaction modes
 
 The system operates in two modes: **Interactive** and **Autonomous**.
-
----
 
 ### Interactive mode
 
@@ -207,3 +207,31 @@ To create or switch to a different workspace, set the `WORKSPACE` variable when 
 ```bash
 WORKSPACE=my_workspace mise interactive
 ```
+
+---
+
+## Contribute
+
+We're passionate about building a better Beekeeper, and we couldn't do it without your help! Our project is open-source and community-driven.
+
+- **Want to share an idea or have a question?** Reach out to us on [Discord](https://discord.com/invite/NradeA6ZNF).
+- **Find a bug or have a feature request?** Open an [issue](https://github.com/i-am-bee/beekeeper/issues).
+- **Want to contribute?** Check out our [contribution guidelines](./CONTRIBUTING.md).
+
+We appreciate all types of contributions!
+
+## Maintainers
+
+For information about maintainers, see [MAINTAINERS.md](./MAINTAINERS.md).
+
+## Code of conduct
+
+This project and everyone participating in it are governed by the [Code of Conduct](./CODE_OF_CONDUCT.md). By participating, you are expected to uphold this code. Please read the full text so that you know which actions may or may not be tolerated.
+
+## Legal notice
+
+All content in these repositories including code has been provided by IBM under the associated open source software license and IBM is under no obligation to provide enhancements, updates, or support. IBM developers produced this code as an open source project (not as an IBM product), and IBM makes no assertions as to the level of quality nor security, and will not be maintaining this code going forward.
+
+---
+
+Developed by contributors to the BeeAI project, this initiative is part of the [Linux Foundation AI & Data program](https://lfaidata.foundation/projects/). Its development follows open, collaborative, and community-driven practices.
