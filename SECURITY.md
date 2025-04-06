@@ -1,21 +1,15 @@
 # Security Policy
 
-## Supported Versions
-
-Use this section to tell people about which versions of your project are
-currently being supported with security updates.
-
-| Version | Supported          |
-| ------- | ------------------ |
-| 5.1.x   | :white_check_mark: |
-| 5.0.x   | :x:                |
-| 4.0.x   | :white_check_mark: |
-| < 4.0   | :x:                |
-
 ## Reporting a Vulnerability
 
-Use this section to tell people how to report a vulnerability.
+To report vulnerabilities, you can privately report a potential security issue
+via the GitHub security vulnerabilities feature. This can be done here:
 
-Tell them where to go, how often they can expect to get an update on a
-reported vulnerability, what to expect if the vulnerability is accepted or
-declined, etc.
+https://github.com/i-am-bee/beekeeper/security/advisories
+
+Please do **not** open a public issue about a potential security vulnerability.
+
+You can find more details on the security vulnerability feature in the GitHub
+documentation here:
+
+https://docs.github.com/en/code-security/security-advisories/guidance-on-reporting-and-writing/privately-reporting-a-security-vulnerability
