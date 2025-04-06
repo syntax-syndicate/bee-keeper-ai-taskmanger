@@ -8,7 +8,7 @@
   </picture>
 </p>
 
-**Orchestrate multi-agent systems with centralized supervision and automatic agent creation**
+**Orchestrate multi-agent systems through a central supervisor agent and conversational interface**
 
 ![Alpha](https://img.shields.io/badge/Status-Alpha-red?style=plastic)
 [![Apache 2.0](https://img.shields.io/badge/Apache%202.0-License-EA7826?style=plastic&logo=apache&logoColor=white)](https://github.com/i-am-bee/beeai-framework?tab=Apache-2.0-1-ov-file#readme)
@@ -30,17 +30,20 @@
 
 ## Overview
 
-Beekeeper is an experimental multi-agent system, built on the [BeeAI framework](https://github.com/i-am-bee/beeai-framework), designed to coordinate specialized AI agents for complex tasks. At its core, a central supervisor agent acts as your primary interface, simplifying the setup and management of specialized agents. Instead of manually configuring each agent, you define your objectives, and the supervisor handles the rest.
+**Beekeeper** is an experimental multi-agent orchestration system built on the [BeeAI framework](https://github.com/i-am-bee/beeai-framework). It enables users to manage, supervise, and scale AI agents through a conversational interface without requiring manual configuration from scratch.
+
+At the heart of Beekeeper is a **supervisor agent**, responsible for orchestrating specialized agents to achieve specific objectives. Its modular architecture enables the system to dynamically allocate resources and coordinate task execution. Just describe your objective, and Beekeeper coordinates specialized agents to get it done.
 
 ### Core components
+
+At its core, Beekeeper consists of three primary components:
 1. **Supervision:** A central supervisor agent oversees and coordinates multiple AI agents.
 2. **Agent registry:** A centralized repository of available agents.
 3. **Task management:** Manages and executes complex tasks, breaking them down into smaller sub-tasks.
 
-These components enable seamless task management by coordinating specialized AI agents through an intuitive, conversational interface with the supervisor agent.
-
 ## Key features
 
+Beekeeper offers several key features:
 - 🔄 **Iterative development**: Continuously refine agents and tasks by giving feedback to the supervisor agent.
 - 📁 **Workspace persistence**: Save and reuse configurations for efficiency and consistency.
 - 🚀 **Parallel scalability**: Run multiple agents simultaneously for complex tasks.
@@ -50,9 +53,11 @@ These components enable seamless task management by coordinating specialized AI 
 ---
 
 ## Installation
-[Mise-en-place](https://mise.jdx.dev/) is used to manage tool versions (`python`, `uv`, `nodejs`, `pnpm`...), run tasks, and handle environments, automatically downloading required tools.
 
-Clone the project, then run:
+> [!NOTE]
+> [Mise](https://mise.jdx.dev/) is used to manage tool versions (`python`, `uv`, `nodejs`, `pnpm`...), run tasks, and handle environments by automatically downloading required tools.
+
+**Clone the project, then run:**
 
 ```sh
 brew install mise  # more ways to install: https://mise.jdx.dev/installing-mise.html
@@ -126,19 +131,20 @@ SEARCH_TOOL="duckduckgo"
 
 ## Quickstart
 
-| Step | Action                                           | Explanation                                                                                      |
-|------|--------------------------------------------------|--------------------------------------------------------------------------------------------------|
-| **1** | Run:<br> `WORKSPACE=trip_planner mise interactive`  | Run this command to start the interactive mode of the `mise` tool. This will allow you to input prompts easily and save your work in `output/workspaces/trip_planner`. |
-| **2** | Split the terminal, then run:<br> `mise monitor`  | View a live activity feed of the platform's tasks and agents. |
-| **3** | Input the following prompt: <br> `I'm heading to Boston next week and need help planning a simple 3-day itinerary. I’ll be staying in Back Bay and want to see historical sites, catch a hockey or basketball game, and enjoy great food. Can you recommend one dinner spot each night - Italian, Chinese, and French?` | Observe the supervisor agent create tasks and generate specialized agents. |
-| **4** | Modify an existing agent:<br> `Can you change the instructions of the restaurant agent to only suggest restaurants that offer gluten free?` | Watch the supervisor agent update the instructions of the `restaurant_researcher`. |
-| **5** | Add more agents:<br> `I also want suggestions for the best hotels around the North End Boston.` | Observe the supervisor agent create an additional agent focused on accomodations. |
-| **6** | Now that you have all your agents set up, close out of the session (`esc` 2x, click yes) and start fresh:<br> `WORKSPACE=trip_planner mise interactive` | Revisit your multi-agent system at any time using this command. All tasks and agents are preserved in `output/workspaces/trip_planner`. |
-| **7** | Finally, engage all agents with a prompt: `I'm traveling to Boston MA next week for 3 days. I want some excellent restaurant recommendations and hotel suggestions.` | Notice all agent configurations are preserved, allowing you to build on your work. For example, there is no need to specify gluten-free restaurants since your restaurant agents configuration is preserved. |
+Here’s how to spin up your first multi-agent system:
 
-**You've just built your first multi-agent system with Beekeeper 👏**
+| Step | Command                                           | Description                                         |
+|------|--------------------------------------------------|-----------------------------------------------------|
+| **1** | Run:<br> `WORKSPACE=trip_planner mise interactive`  | Launch the interactive UI and create a new workspace. Use **interactive mode** when building your system. |
+| **2** | Split the terminal, then run:<br> `mise monitor`  | Watch live task execution and agent logs. |
+| **3** | Input the following prompt: <br> `I'm heading to Boston next week and need help planning a simple 3-day itinerary. I’ll be staying in Back Bay and want to see historical sites, catch a hockey or basketball game, and enjoy great food. Can you recommend one dinner spot each night - Italian, Chinese, and French?` | The supervisor will break this down into subtasks and automatically configure agents. |
+| **4** | Modify an existing agent:<br> `Can you change the instructions of the restaurant agent to only suggest restaurants that offer gluten free?` | Ask the supervisor to change or constrain behavior of an agent. |
+| **5** | Add more agents:<br> `Can you also create an accomodation specialist that can recommend I also want suggestions for the best hotels in the Back Bay area.` | Expand your system with new capabilities. |
+| **6** | Close out of the session (`esc` 2x, click yes) and start fresh:<br> `WORKSPACE=trip_planner mise autonomous >>> "I'm traveling to Boston MA next week for 3 days. Create a 5-day itinerary with some excellent restaurant and sports game recommendations."` | All tasks and agents are preserved in `output/workspaces/trip_planner`. Once your system is set up, use **autonomous mode** for one-shot execution.  |
 
-Now you're ready to iterate, expand, or even create something completely new!
+**You've just spun up and evolved your first multi-agent system with Beekeeper 👏**
+
+Now you're ready to iterate, expand, or even create something entirely new!
 
 ---
 
