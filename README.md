@@ -139,7 +139,7 @@ Here’s how to spin up your first multi-agent system:
 | **2** | Split the terminal, then run:<br> `mise monitor`  | Watch live task execution and agent logs. |
 | **3** | Input the following prompt: <br> `I'm heading to Boston next week and need help planning a simple 3-day itinerary. I’ll be staying in Back Bay and want to see historical sites, catch a hockey or basketball game, and enjoy great food. Can you recommend one dinner spot each night - Italian, Chinese, and French?` | The supervisor will break this down into subtasks and automatically configure agents. |
 | **4** | Modify an existing agent:<br> `Can you change the instructions of the restaurant agent to only suggest restaurants that offer gluten free?` | Ask the supervisor to change or constrain behavior of an agent. |
-| **5** | Close out of the session (`esc` 2x, click yes) and start fresh:<br> `WORKSPACE=trip_planner mise autonomous >>> "I'm traveling to Boston MA next week for 3 days. Create a 5-day itinerary with some excellent restaurant and sports game recommendations."` | All tasks and agents are preserved in `output/workspaces/trip_planner`. Once your system is set up, use **autonomous mode** for one-shot execution. |
+| **5** | Close out of the session (`esc` 2x, click yes) and start fresh:<br> `WORKSPACE=trip_planner mise autonomous <<< "I'm traveling to Boston MA next week for 3 days. Create a 5-day itinerary with some excellent restaurant and sports game recommendations."` | All tasks and agents are preserved in `output/workspaces/trip_planner`. Once your system is set up, use **autonomous mode** for one-shot execution. |
 
 **You've just spun up and evolved your first multi-agent system with Beekeeper 👏**
 
