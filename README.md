@@ -51,7 +51,8 @@ Beekeeper offers several key features:
 - 📡 **Active monitoring**: Get real-time insights to detect and fix issues quickly.
 - 
 
-🎥 Check out our [demo video]()
+🎥 Check out our [demo video](https://youtu.be/byilNj3rmN8?si=H9M3P3e7QQNp0kGa)
+
 
 ---
 
