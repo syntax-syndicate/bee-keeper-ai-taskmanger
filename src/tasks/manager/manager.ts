@@ -21,6 +21,7 @@ import { TaskStateLogger } from "@tasks/state/logger.js";
 import { WorkspaceResource } from "@workspaces/manager/index.js";
 import { WorkspaceRestorable } from "@workspaces/restore/index.js";
 import { AbortError, FrameworkError, Logger } from "beeai-framework";
+import { AssistantMessage, ToolMessage } from "beeai-framework/backend/message";
 import EventEmitter from "events";
 import { clone, difference, isNonNullish, omit } from "remeda";
 import {
@@ -44,18 +45,20 @@ import {
   TaskConfigVersionValue,
   TaskKindEnum,
   TaskKindEnumSchema,
+  TaskKindValue,
   TaskRun,
   TaskRunHistoryEntry,
   TaskRunIdValue,
   TaskRunKindEnum,
+  TaskRunKindEnumSchema,
   TaskRunStatusEnum,
   TaskRunStatusEnumSchema,
   TaskRunTerminalStatusEnum,
   TaskTypeValue,
 } from "./dto.js";
 import {
-  serializeTaskRunInput,
   extendBlockingTaskRunOutput,
+  serializeTaskRunInput,
   taskRunError,
   taskRunOutput,
 } from "./helpers.js";
@@ -115,6 +118,7 @@ export type OnTaskStart = (
       taskManage: TaskManager,
     ) => void;
   },
+  addToMemory?: (AssistantMessage | ToolMessage)[],
 ) => Promise<unknown>;
 
 interface TaskManagerEvents {
@@ -1114,19 +1118,41 @@ export class TaskManager extends WorkspaceRestorable {
       );
     }
 
+    // Hack: Automatically set originTaskRun as blocked if there is no other blocked by task run to prevent stuck
+    const blockedByTaskRunIds = options?.blockedByTaskRunIds?.length
+      ? options.blockedByTaskRunIds
+      : options?.originTaskRunId
+        ? [options?.originTaskRunId]
+        : [];
+
+    if (blockedByTaskRunIds?.length) {
+      const notFoundTaskRuns = blockedByTaskRunIds.filter(
+        (taskRunId) => this.taskRuns.get(taskRunId) == null,
+      );
+      if (notFoundTaskRuns.length) {
+        throw new Error(
+          `Undefined task run ids: ${notFoundTaskRuns.join(",")}`,
+        );
+      }
+    }
+
+    const hasUnfinishedBlockingTasks = !!blockedByTaskRunIds.filter(
+      (id) => (options?.originTaskRunId ?? taskRunId) !== id,
+    ).length;
     const input = serializeTaskRunInput({
       context: `You are acting on behalf of task \`${taskRunId}\`:\n${config.description}`,
       input: taskRunInput,
       options: {
-        hasUnfinishedBlockingTasks: !!options?.blockedByTaskRunIds?.length,
+        hasUnfinishedBlockingTasks,
       },
     });
 
+    const originTaskRunId = options?.originTaskRunId ?? taskRunId;
     const baseTaskRun: BaseTaskRun = {
       taskKind,
       taskType,
       taskRunId,
-      originTaskRunId: options?.originTaskRunId ?? taskRunId,
+      originTaskRunId,
       taskConfigVersion: config.taskConfigVersion,
       taskRunNum,
       taskRunInput: input,
@@ -1140,7 +1166,7 @@ export class TaskManager extends WorkspaceRestorable {
       currentTrajectory: [],
       history: [],
       isDependent: false,
-      blockedByTaskRunIds: options?.blockedByTaskRunIds ?? [],
+      blockedByTaskRunIds,
       blockingTaskRunIds: [],
     };
 
@@ -1185,8 +1211,8 @@ export class TaskManager extends WorkspaceRestorable {
       this.ac.createResource(taskRunId, actingAgentId, actingAgentId);
     }
 
-    if (options?.blockedByTaskRunIds) {
-      for (const blockedByTaskRunId of options.blockedByTaskRunIds) {
+    if (blockedByTaskRunIds) {
+      for (const blockedByTaskRunId of blockedByTaskRunIds) {
         const blockedByTaskRun = this.getTaskRun(
           blockedByTaskRunId,
           actingAgentId,
@@ -1222,16 +1248,47 @@ export class TaskManager extends WorkspaceRestorable {
     });
 
     if (config.runImmediately) {
-      this.scheduleStartTaskRun(taskRunId, actingAgentId);
+      this.scheduleStartTaskRun(taskRunId, actingAgentId, {
+        initiatingTaskRunId: originTaskRunId,
+      });
     }
 
     return taskRun;
   }
 
-  scheduleStartTaskRuns(
-    taskRunIds: string[],
+  scheduleStartInteractionBlockingTaskRuns(
+    interactionTaskRunId: TaskRunIdValue,
     actingAgentId: string,
     options?: {
+      signal?: AbortSignal;
+      manualStart?: boolean;
+    },
+  ) {
+    this.logger.info(
+      { interactionTaskRunId },
+      "Schedule interaction blocking task runs start",
+    );
+
+    const interactionTaskRun = this.getTaskRun(
+      interactionTaskRunId,
+      actingAgentId,
+    );
+
+    return this.scheduleStartTaskRuns(
+      interactionTaskRun.blockingTaskRunIds,
+      actingAgentId,
+      {
+        ...options,
+        initiatingTaskRunId: interactionTaskRunId,
+      },
+    );
+  }
+
+  scheduleStartTaskRuns(
+    taskRunIds: TaskRunIdValue[],
+    actingAgentId: string,
+    options?: {
+      initiatingTaskRunId?: TaskRunIdValue;
       signal?: AbortSignal;
       manualStart?: boolean;
     },
@@ -1249,6 +1306,7 @@ export class TaskManager extends WorkspaceRestorable {
     taskRunId: TaskRunIdValue,
     actingAgentId: AgentIdValue,
     options?: {
+      initiatingTaskRunId?: TaskRunIdValue;
       signal?: AbortSignal;
       manualStart?: boolean;
     },
@@ -1256,10 +1314,29 @@ export class TaskManager extends WorkspaceRestorable {
     this.logger.info({ taskRunId, actingAgentId }, "Schedule task run start");
     this.ac.checkPermission(taskRunId, actingAgentId, FULL_ACCESS);
 
-    const taskRun = this.taskRuns.get(taskRunId);
-    if (!taskRun) {
-      this.logger.error({ taskRunId }, "Task run not found");
-      throw new Error(`Task run ${taskRunId} not found`);
+    let initiatingTaskRunId = options?.initiatingTaskRunId;
+
+    const taskRun = this.getTaskRun(taskRunId, TASK_MANAGER_USER);
+    // Validate initial task run
+    if (taskRun.taskRunKind === "automatic") {
+      if (!initiatingTaskRunId) {
+        throw new Error(
+          `Automatic task runs require a specified 'initiatingTaskRunId' attribute`,
+        );
+      } else {
+        // Check initial task run kind
+        const initiatingTaskRun = this.getTaskRun(
+          initiatingTaskRunId,
+          TASK_MANAGER_USER,
+        );
+        if (initiatingTaskRun.taskRunKind !== "interaction") {
+          throw new Error(
+            `Invalid initiating task run kind '${initiatingTaskRun.taskRunKind}'. Initiating task run must be '${TaskRunKindEnumSchema.Values.interaction}'`,
+          );
+        }
+      }
+    } else {
+      initiatingTaskRunId = taskRun.taskRunId;
     }
 
     if (options?.manualStart) {
@@ -1301,12 +1378,16 @@ export class TaskManager extends WorkspaceRestorable {
 
     this._updateTaskRun(taskRunId, taskRun, {
       status: "SCHEDULED",
+      initiatingTaskRunId,
     });
     if (options?.signal) {
       taskRun.abortScope.switchSignal(options.signal);
     }
 
-    this.scheduledTasksToStart.push({ taskRunId, actingAgentId });
+    this.scheduledTasksToStart.push({
+      taskRunId,
+      actingAgentId,
+    });
     this.startTaskProcessing();
 
     return {
@@ -1399,53 +1480,74 @@ export class TaskManager extends WorkspaceRestorable {
       finalStatus: FinalStatus,
     ) => {
       // Close interaction
-      const originateInteraction = this.getTaskRun(
+      const interactionTaskRun = this.getTaskRun(
         interactionTaskRunId,
         TASK_MANAGER_USER,
       );
-      if (!originateInteraction) {
+      if (!interactionTaskRun) {
         throw new Error(
-          `Interaction task run \`${taskRun.originTaskRunId}\` is missing`,
+          `Interaction task run \`${interactionTaskRun}\` is missing`,
         );
       }
-      if (originateInteraction.taskRunKind != "interaction") {
+      if (interactionTaskRun.taskRunKind != "interaction") {
         throw new Error(
-          `Task run \`${taskRun.originTaskRunId}\` is not an interaction`,
+          `Task run \`${interactionTaskRun}\` is not an interaction`,
         );
       }
 
       const hasFailed = finalStatus === "FAILED";
 
-      this._updateTaskRun(
-        originateInteraction.taskRunId,
-        originateInteraction,
-        {
+      const interactionChildrenTaskRuns =
+        this._findInteractionChildrenTaskRuns(interactionTaskRunId);
+      const hasUnfinishedChildrenTasks = !!interactionChildrenTaskRuns.filter(
+        (childTaskRun) => !isTaskRunTerminationStatus(childTaskRun.status),
+      ).length;
+
+      if (hasFailed || !hasUnfinishedChildrenTasks) {
+        let response;
+        if (!hasFailed) {
+          // Find last tasks in the hierarchy and collect their outputs
+          const lastTasks = interactionChildrenTaskRuns.filter(
+            (taskRun) => taskRun.blockingTaskRunIds.length === 0,
+          );
+          if (lastTasks.length) {
+            response = lastTasks
+              .map((taskRun) => taskRunOutput(taskRun, false))
+              .join("\n\n");
+          } else {
+            response = taskRunOutput(interactionTaskRun);
+          }
+        } else {
+          response = taskRunError(taskRun);
+        }
+
+        this._updateTaskRun(interactionTaskRun.taskRunId, interactionTaskRun, {
           interactionStatus: hasFailed ? "FAILED" : "COMPLETED",
-          response: !hasFailed
-            ? taskRunOutput(taskRun, false)
-            : taskRunError(taskRun),
-        },
-      );
+          response,
+        });
+      }
     };
 
+    let shouldCloseInteraction = false;
+    let interactionTaskRunId;
     if (taskRun.taskRunKind === "interaction") {
-      if (
-        !Array.from(this.taskRuns.values()).some(
-          (run) =>
-            run.taskRunKind === "automatic" &&
-            run.originTaskRunId === taskRun.taskRunId,
-        )
-      ) {
-        closeInteraction(taskRunId, finalStatus);
+      const interactionChildrenTaskRuns =
+        this._findInteractionChildrenTaskRuns(taskRunId);
+      if (finalStatus === "STOPPED" && interactionChildrenTaskRuns.length) {
+        // Stopping children tasks
+        for (const childTask of interactionChildrenTaskRuns) {
+          this.stopTaskRun(childTask.taskRunId, actingAgentId, finalStatus);
+        }
+      } else {
+        shouldCloseInteraction = true;
+        interactionTaskRunId = taskRunId;
       }
     } else if (taskRun.taskRunKind === "automatic") {
+      // Process blocking tasks
       if (taskRun.blockingTaskRunIds.length > 0) {
-        // Run blocking task runs
-        const blockingTaskRunIdsToStart: string[] = [];
-
         for (const blockingTaskRunId of taskRun.blockingTaskRunIds) {
-          const hasUnfinishedBlockedTaskRuns =
-            this._hasUnfinishedBlockedTaskRunsOtherThan(
+          const hasOtherUnfinishedBlockedTaskRuns =
+            this.hasOtherUnfinishedBlockedTaskRuns(
               blockingTaskRunId,
               taskRunId,
             );
@@ -1459,32 +1561,34 @@ export class TaskManager extends WorkspaceRestorable {
             // Abort blocking task runs when failed
             blockingTaskRun.abortScope?.abort();
           } else {
+            // Pass output into blocking task input
             this._updateTaskRun(blockingTaskRunId, blockingTaskRun, {
               taskRunInput: extendBlockingTaskRunOutput(
                 blockingTaskRun.taskRunInput,
                 taskRunOutput(taskRun, false),
-                hasUnfinishedBlockedTaskRuns,
+                hasOtherUnfinishedBlockedTaskRuns,
               ),
               originTaskRunId: taskRun.originTaskRunId,
             });
 
-            if (!hasUnfinishedBlockedTaskRuns) {
-              blockingTaskRunIdsToStart.push(blockingTaskRunId);
+            if (!hasOtherUnfinishedBlockedTaskRuns) {
+              if (!taskRun.initiatingTaskRunId) {
+                throw new Error(
+                  `Task run requires a specified 'initiatingTaskRunId' attribute`,
+                );
+              }
+
+              // Task doesn't wait to any unfinished blocked task so we can start it
+              this.scheduleStartTaskRun(blockingTaskRunId, TASK_MANAGER_USER, {
+                initiatingTaskRunId: taskRun.initiatingTaskRunId,
+                signal: taskRun.abortScope.signal,
+              });
             }
           }
         }
-
-        if (blockingTaskRunIdsToStart.length) {
-          this.scheduleStartTaskRuns(
-            blockingTaskRunIdsToStart,
-            TASK_MANAGER_USER,
-            {
-              signal: taskRun.abortScope.signal,
-            },
-          );
-        }
       } else {
-        closeInteraction(taskRun.originTaskRunId, finalStatus);
+        shouldCloseInteraction = true;
+        interactionTaskRunId = taskRun.initiatingTaskRunId! /* FIXME */;
       }
     }
 
@@ -1493,7 +1597,14 @@ export class TaskManager extends WorkspaceRestorable {
       nextRunAt: undefined,
     });
 
-    this.logger.info({ taskRunId }, "Task stopped successfully");
+    if (shouldCloseInteraction) {
+      if (!interactionTaskRunId) {
+        throw new Error(`Missing interaction task run ID`);
+      }
+      closeInteraction(interactionTaskRunId, finalStatus);
+    }
+
+    this.logger.info({ taskRunId, finalStatus }, "Task stopped successfully");
 
     return {
       relatedId: taskRunId,
@@ -1501,13 +1612,13 @@ export class TaskManager extends WorkspaceRestorable {
     };
   }
 
-  private _hasUnfinishedBlockedTaskRunsOtherThan(
+  private hasOtherUnfinishedBlockedTaskRuns(
     taskRunId: TaskRunIdValue,
-    exception: TaskRunIdValue,
+    currentBlockedTaskRunId: TaskRunIdValue,
   ) {
     const taskRun = this.getTaskRun(taskRunId, TASK_MANAGER_USER);
     for (const blockedTaskRunId of difference(taskRun.blockedByTaskRunIds, [
-      exception,
+      currentBlockedTaskRunId,
     ])) {
       const blockedTaskRun = this.getTaskRun(
         blockedTaskRunId,
@@ -1618,7 +1729,10 @@ export class TaskManager extends WorkspaceRestorable {
     });
   }
 
-  findTaskRunsOwnedBy(agentId: AgentIdValue, actingAgentId: AgentIdValue) {
+  private findTaskRunsOwnedBy(
+    agentId: AgentIdValue,
+    actingAgentId: AgentIdValue,
+  ) {
     this.logger.info(
       { agentId, actingAgentId },
       "Looking for running tasks owned by agent",
@@ -1632,6 +1746,38 @@ export class TaskManager extends WorkspaceRestorable {
           READ_ONLY_ACCESS,
         );
         result.push(clone(task));
+      }
+    }
+
+    return result;
+  }
+
+  findInteractionChildrenTaskRuns(
+    interactionTaskRunId: TaskRunIdValue,
+    actingAgentId: AgentIdValue,
+  ) {
+    this.ac.checkPermission(
+      interactionTaskRunId,
+      actingAgentId,
+      READ_ONLY_ACCESS,
+    );
+    return this._findInteractionChildrenTaskRuns(interactionTaskRunId);
+  }
+
+  private _findInteractionChildrenTaskRuns(
+    interactionTaskRunId: TaskRunIdValue,
+  ) {
+    this.logger.info(
+      { interactionTaskRunId },
+      `Looking for task runs initiate by interaction task run`,
+    );
+    const result = [];
+    for (const taskRun of this.taskRuns.values()) {
+      if (
+        taskRun.initiatingTaskRunId === interactionTaskRunId &&
+        taskRun.taskRunId !== interactionTaskRunId
+      ) {
+        result.push(taskRun);
       }
     }
 
@@ -1831,7 +1977,11 @@ export class TaskManager extends WorkspaceRestorable {
       }
 
       this.awaitingTasksForAgents.splice(index, 1);
-      this.scheduleStartTaskRun(taskRunId, TASK_MANAGER_USER);
+
+      const taskRun = this.getTaskRun(taskRunId, TASK_MANAGER_USER);
+      this.scheduleStartTaskRun(taskRunId, TASK_MANAGER_USER, {
+        initiatingTaskRunId: taskRun.initiatingTaskRunId,
+      });
       rest--;
       if (!rest) {
         return;
@@ -1939,12 +2089,39 @@ export class TaskManager extends WorkspaceRestorable {
   /**
    * Gets all task runs visible to the agent.
    */
-  getAllTaskRuns(agentId: AgentIdValue): TaskRun[] {
+  getAllTaskRuns(
+    agentId: AgentIdValue,
+    filter?: { taskKind: TaskKindValue; taskType?: TaskTypeValue },
+  ): TaskRun[] {
     this.logger.info({ agentId }, "Getting all task runs");
 
-    const taskRuns = Array.from(this.taskRuns.values()).filter((taskRun) =>
-      this.ac.hasPermission(taskRun.taskRunId, agentId, READ_ONLY_ACCESS),
-    );
+    const taskRuns = Array.from(this.taskRuns.values()).filter((taskRun) => {
+      // First check permission
+      const hasPermission = this.ac.hasPermission(
+        taskRun.taskRunId,
+        agentId,
+        READ_ONLY_ACCESS,
+      );
+
+      if (!hasPermission) {
+        return false;
+      }
+
+      // Then apply additional filters if they exist
+      if (filter) {
+        // Always filter by taskKind
+        if (taskRun.taskKind !== filter.taskKind) {
+          return false;
+        }
+
+        // Optionally filter by taskType if provided
+        if (filter.taskType && taskRun.taskType !== filter.taskType) {
+          return false;
+        }
+      }
+
+      return true;
+    });
 
     this.logger.debug(
       { agentId, count: taskRuns.length },
@@ -2050,183 +2227,217 @@ export class TaskManager extends WorkspaceRestorable {
         throw new AbortError();
       }
 
+      // Add last interaction output to the agent memory
+      let addToMemory: (AssistantMessage | ToolMessage)[] | undefined =
+        undefined;
+      if (taskRun.taskRunKind === "interaction") {
+        const allTerminatedInteractionTaskRuns = this.getAllTaskRuns(
+          TASK_MANAGER_USER,
+          {
+            taskKind: taskRun.taskKind,
+            taskType: taskRun.taskType,
+          },
+        ).filter((taskRun) =>
+          isTaskRunTerminationStatus(taskRun.status),
+        ) as InteractionTaskRun[];
+        const lastTaskRun = allTerminatedInteractionTaskRuns.length
+          ? allTerminatedInteractionTaskRuns.at(-1)
+          : null;
+        if (lastTaskRun?.response) {
+          addToMemory = [
+            new AssistantMessage(
+              `The full final response of the previous interaction task \`${lastTaskRun.taskRunId}\` (NOTE: This message is the result of different tool calls that are not provided before this message to save costs):\n${lastTaskRun.response}`,
+            ),
+          ];
+        }
+      }
+
       const logger = this.logger;
       // Wrap the onTaskStart call with abort handling
       await Promise.race([
-        this.onTaskStart(taskRun, this, {
-          onAwaitingAgentAcquired(taskRunId, taskManager) {
-            logger.debug({ taskRunId }, "Awaiting to agent acquired");
-            // Check if aborted before making state changes
-            if (executionSignal.aborted) {
-              return;
-            }
-            taskManager.setTaskRunAwaitingAgent(taskRunId);
-          },
-          onAgentAcquired(taskRunId, agentId, taskManager) {
-            logger.debug({ taskRunId, agentId }, "Agent acquired");
-            // Check if aborted before making state changes
-            if (executionSignal.aborted) {
-              return;
-            }
-            taskManager.setTaskRunOccupied(taskRunId, agentId);
-          },
-          onAgentUpdate(key, value, taskRunId, agentId, taskManager) {
-            logger.debug({ key, value, taskRunId, agentId }, "Agent update");
-            // Check if aborted before making state changes
-            if (executionSignal.aborted) {
-              return;
-            }
-            const taskRun = taskManager.getTaskRun(
-              taskRunId,
-              agentId,
-              READ_WRITE_ACCESS,
-            );
-            taskManager._updateTaskRun(taskRunId, taskRun, {
-              currentTrajectory: [
-                { timestamp: new Date(), agentId, key, value },
-              ],
-            });
-            emit("task_run:trajectory_update", clone(taskRun));
-          },
-          onAgentComplete(output, taskRunId, agentId, taskManager) {
-            logger.debug({ taskRunId, agentId }, "Agent complete");
-            // Check if aborted before making state changes
-            if (executionSignal.aborted) {
-              return;
-            }
-
-            const taskRun = taskManager.getTaskRun(
-              taskRunId,
-              agentId,
-              READ_WRITE_ACCESS,
-            );
-            const trajectory = clone(taskRun.currentTrajectory);
-            taskManager._updateTaskRun(taskRunId, taskRun, {
-              completedRuns: taskRun.completedRuns + 1,
-              currentTrajectory: [],
-            });
-
-            // Record history entry
-            taskManager.addHistoryEntry(taskRunId, agentId, {
-              timestamp: new Date(),
-              terminalStatus: "COMPLETED",
-              output,
-              runNumber: taskRun.completedRuns,
-              maxRuns: taskRun.config.maxRepeats,
-              retryAttempt: taskRun.currentRetryAttempt,
-              maxRepeats: taskRun.config.maxRepeats,
-              agentId: agentId,
-              trajectory,
-              executionTimeMs: Date.now() - startTime,
-            });
-
-            emit("task_run:complete", clone(taskRun));
-
-            taskManager.logger.debug(
-              {
+        this.onTaskStart(
+          taskRun,
+          this,
+          {
+            onAwaitingAgentAcquired(taskRunId, taskManager) {
+              logger.debug({ taskRunId }, "Awaiting to agent acquired");
+              // Check if aborted before making state changes
+              if (executionSignal.aborted) {
+                return;
+              }
+              taskManager.setTaskRunAwaitingAgent(taskRunId);
+            },
+            onAgentAcquired(taskRunId, agentId, taskManager) {
+              logger.debug({ taskRunId, agentId }, "Agent acquired");
+              // Check if aborted before making state changes
+              if (executionSignal.aborted) {
+                return;
+              }
+              taskManager.setTaskRunOccupied(taskRunId, agentId);
+            },
+            onAgentUpdate(key, value, taskRunId, agentId, taskManager) {
+              logger.debug({ key, value, taskRunId, agentId }, "Agent update");
+              // Check if aborted before making state changes
+              if (executionSignal.aborted) {
+                return;
+              }
+              const taskRun = taskManager.getTaskRun(
                 taskRunId,
-                completedRuns: taskRun.completedRuns,
-                maxRuns: taskRun.config.maxRepeats,
-              },
-              "Task executed successfully",
-            );
+                agentId,
+                READ_WRITE_ACCESS,
+              );
+              taskManager._updateTaskRun(taskRunId, taskRun, {
+                currentTrajectory: [
+                  { timestamp: new Date(), agentId, key, value },
+                ],
+              });
+              emit("task_run:trajectory_update", clone(taskRun));
+            },
+            onAgentComplete(output, taskRunId, agentId, taskManager) {
+              logger.debug({ taskRunId, agentId }, "Agent complete");
+              // Check if aborted before making state changes
+              if (executionSignal.aborted) {
+                return;
+              }
 
-            // Check if we've reached maxRuns
-            if (
-              !taskRun.config.maxRepeats ||
-              (taskRun.config.maxRepeats &&
-                taskRun.completedRuns >= taskRun.config.maxRepeats)
-            ) {
-              taskManager.stopTaskRun(taskRunId, agentId, "COMPLETED");
-              taskManager.logger.info(
+              const taskRun = taskManager.getTaskRun(
+                taskRunId,
+                agentId,
+                READ_WRITE_ACCESS,
+              );
+              const trajectory = clone(taskRun.currentTrajectory);
+              taskManager._updateTaskRun(taskRunId, taskRun, {
+                completedRuns: taskRun.completedRuns + 1,
+                currentTrajectory: [],
+              });
+
+              // Record history entry
+              taskManager.addHistoryEntry(taskRunId, agentId, {
+                timestamp: new Date(),
+                terminalStatus: "COMPLETED",
+                output,
+                runNumber: taskRun.completedRuns,
+                maxRuns: taskRun.config.maxRepeats,
+                retryAttempt: taskRun.currentRetryAttempt,
+                maxRepeats: taskRun.config.maxRepeats,
+                agentId: agentId,
+                trajectory,
+                executionTimeMs: Date.now() - startTime,
+              });
+
+              emit("task_run:complete", clone(taskRun));
+
+              taskManager.logger.debug(
                 {
                   taskRunId,
                   completedRuns: taskRun.completedRuns,
                   maxRuns: taskRun.config.maxRepeats,
                 },
-                "Task reached maximum runs and has been stopped",
+                "Task executed successfully",
               );
-            } else {
-              taskManager.releaseTaskRunOccupancy(taskRunId, agentId);
-            }
-          },
-          async onAgentError(err, taskRunId, agentId, taskManager) {
-            logger.debug({ taskRunId, agentId, err }, "Agent error");
-            // Check if aborted before making state changes
-            if (executionSignal.aborted) {
-              return;
-            }
 
-            let error;
-            if (err instanceof FrameworkError) {
-              error = err.explain();
-            } else {
-              error = err instanceof Error ? err.message : String(err);
-            }
+              // Check if we've reached maxRuns
+              if (
+                !taskRun.config.maxRepeats ||
+                (taskRun.config.maxRepeats &&
+                  taskRun.completedRuns >= taskRun.config.maxRepeats)
+              ) {
+                taskManager.stopTaskRun(taskRunId, agentId, "COMPLETED");
+                taskManager.logger.info(
+                  {
+                    taskRunId,
+                    completedRuns: taskRun.completedRuns,
+                    maxRuns: taskRun.config.maxRepeats,
+                  },
+                  "Task reached maximum runs and has been stopped",
+                );
+              } else {
+                taskManager.releaseTaskRunOccupancy(taskRunId, agentId);
+              }
+            },
+            async onAgentError(err, taskRunId, agentId, taskManager) {
+              logger.debug({ taskRunId, agentId, err }, "Agent error");
+              // Check if aborted before making state changes
+              if (executionSignal.aborted) {
+                return;
+              }
 
-            const taskRun = taskManager.getTaskRun(taskRunId, agentId);
-            const trajectory = clone(taskRun.currentTrajectory);
+              let error;
+              if (err instanceof FrameworkError) {
+                error = err.explain();
+              } else {
+                error = err instanceof Error ? err.message : String(err);
+              }
 
-            taskManager._updateTaskRun(taskRunId, taskRun, {
-              errorCount: taskRun.errorCount + 1,
-              completedRuns: taskRun.completedRuns + 1,
-              currentTrajectory: [],
-            });
-            const retryAttempt = taskRun.currentRetryAttempt;
+              const taskRun = taskManager.getTaskRun(taskRunId, agentId);
+              const trajectory = clone(taskRun.currentTrajectory);
 
-            // Record history entry
-            taskManager.addHistoryEntry(taskRunId, agentId, {
-              timestamp: new Date(),
-              terminalStatus: "FAILED",
-              error,
-              runNumber: taskRun.completedRuns,
-              maxRuns: taskRun.config.maxRepeats,
-              retryAttempt,
-              maxRepeats: taskRun.config.maxRepeats,
-              agentId: agentId,
-              trajectory,
-              executionTimeMs: Date.now() - startTime,
-            });
+              taskManager._updateTaskRun(taskRunId, taskRun, {
+                errorCount: taskRun.errorCount + 1,
+                completedRuns: taskRun.completedRuns + 1,
+                currentTrajectory: [],
+              });
+              const retryAttempt = taskRun.currentRetryAttempt;
 
-            emit("task_run:error", clone(taskRun));
-
-            taskManager.logger.error(
-              {
-                taskRunId,
+              // Record history entry
+              taskManager.addHistoryEntry(taskRunId, agentId, {
+                timestamp: new Date(),
+                terminalStatus: "FAILED",
+                error,
                 runNumber: taskRun.completedRuns,
                 maxRuns: taskRun.config.maxRepeats,
                 retryAttempt,
                 maxRepeats: taskRun.config.maxRepeats,
-                errorCount: taskRun.errorCount,
-                error,
-              },
-              `Task execution failed ${error}`,
-            );
-
-            if (taskManager.options.errorHandler) {
-              taskManager.options.errorHandler(err as Error, taskRunId);
-            }
-
-            taskManager.logger.debug(
-              { taskRunId },
-              "Releasing task occupancy before removal",
-            );
-
-            if (retryAttempt >= (taskRun.config.maxRetries || 2)) {
-              taskManager.stopTaskRun(taskRunId, agentId, "FAILED");
-            } else {
-              taskManager.releaseTaskRunOccupancy(taskRunId, agentId);
-              taskManager._updateTaskRun(taskRunId, taskRun, {
-                currentRetryAttempt: retryAttempt + 1,
-                status: "FAILED",
+                agentId: agentId,
+                trajectory,
+                executionTimeMs: Date.now() - startTime,
               });
-              taskManager.scheduleStartTaskRun(
-                taskRunId,
-                taskRun.config.ownerAgentId,
+
+              emit("task_run:error", clone(taskRun));
+
+              taskManager.logger.error(
+                {
+                  taskRunId,
+                  runNumber: taskRun.completedRuns,
+                  maxRuns: taskRun.config.maxRepeats,
+                  retryAttempt,
+                  maxRepeats: taskRun.config.maxRepeats,
+                  errorCount: taskRun.errorCount,
+                  error,
+                },
+                `Task execution failed ${error}`,
               );
-            }
+
+              if (taskManager.options.errorHandler) {
+                taskManager.options.errorHandler(err as Error, taskRunId);
+              }
+
+              taskManager.logger.debug(
+                { taskRunId },
+                "Releasing task occupancy before removal",
+              );
+
+              if (retryAttempt >= (taskRun.config.maxRetries || 2)) {
+                taskManager.stopTaskRun(taskRunId, agentId, "FAILED");
+              } else {
+                taskManager.releaseTaskRunOccupancy(taskRunId, agentId);
+                taskManager._updateTaskRun(taskRunId, taskRun, {
+                  currentRetryAttempt: retryAttempt + 1,
+                  status: "FAILED",
+                });
+
+                taskManager.scheduleStartTaskRun(
+                  taskRunId,
+                  taskRun.config.ownerAgentId,
+                  {
+                    initiatingTaskRunId: taskRun.initiatingTaskRunId!,
+                  },
+                );
+              }
+            },
           },
-        }),
+          addToMemory,
+        ),
         // Create a promise that rejects when the abort signal is triggered
         new Promise<never>((_, reject) => {
           executionSignal.addEventListener(

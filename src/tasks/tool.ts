@@ -50,10 +50,12 @@ export const CreateTaskConfigSchema = z
   .object({
     method: z.literal("createTaskConfig"),
     taskConfig: TaskConfigSchema.omit({
+      concurrencyMode: true,
       taskConfigId: true,
       taskConfigVersion: true,
       ownerAgentId: true,
       runImmediately: true,
+      intervalMs: true,
     }),
     actingAgentId: ActingAgentIdValueSchema,
   })
@@ -132,21 +134,30 @@ export const GetAllTaskConfigsSchema = z
   })
   .describe("Gets all created task configs.");
 
-// export const ScheduleStartTaskRunSchema = z
-//   .object({
-//     method: z.literal("scheduleStartTaskRun"),
-//     taskRunId: TaskRunIdValueSchema,
-//     actingAgentId: ActingAgentIdValueSchema,
-//   })
-//   .describe("Starts a task run.");
+export const ScheduleStartInteractionBlockingTaskRunsSchema = z
+  .object({
+    method: z.literal("scheduleStartInteractionBlockingTaskRuns"),
+    interactionTaskRunId: TaskRunIdValueSchema.describe(
+      `The interaction task run ID`,
+    ),
+    actingAgentId: ActingAgentIdValueSchema,
+  })
+  .describe(
+    "Schedules starts of all blocking task runs that are blocked by the the interaction task run simultaneously.",
+  );
 
 export const ScheduleStartTaskRunSchema = z
   .object({
     method: z.literal("scheduleStartTaskRun"),
     taskRunIds: z.array(TaskRunIdValueSchema),
     actingAgentId: ActingAgentIdValueSchema,
+    initiatingTaskRunId: TaskRunIdValueSchema.describe(
+      "IDs of interaction kind of task run that initiate the start",
+    ),
   })
-  .describe("Start a task run or group of task runs simultaneously.");
+  .describe(
+    "Schedules start of a one or group of specific task runs simultaneously.",
+  );
 
 export const StopTaskRunSchema = z
   .object({
@@ -250,6 +261,7 @@ export class TaskManagerTool extends Tool<
       DestroyTaskConfigSchema,
       GetPoolStatsSchema,
       CreateTaskRunSchema,
+      ScheduleStartInteractionBlockingTaskRunsSchema,
       ScheduleStartTaskRunSchema,
       StopTaskRunSchema,
       RemoveTaskRunSchema,
@@ -271,7 +283,12 @@ export class TaskManagerTool extends Tool<
       case "createTaskConfig": {
         const { actingAgentId, taskConfig } = input;
         data = this.taskManager.createTaskConfig(
-          { ...taskConfig, runImmediately: false },
+          {
+            ...taskConfig,
+            runImmediately: false,
+            concurrencyMode: "PARALLEL",
+            intervalMs: 0,
+          },
           actingAgentId,
           actingAgentId,
         );
@@ -333,15 +350,29 @@ export class TaskManagerTool extends Tool<
         );
         break;
       }
-      case "scheduleStartTaskRun":
-        data = this.taskManager.scheduleStartTaskRuns(
-          input.taskRunIds,
-          input.actingAgentId,
+      case "scheduleStartInteractionBlockingTaskRuns": {
+        const { interactionTaskRunId, actingAgentId } = input;
+        data = this.taskManager.scheduleStartInteractionBlockingTaskRuns(
+          interactionTaskRunId,
+          actingAgentId,
           {
             signal: (run.context as any)["task_run_signal"],
           },
         );
         break;
+      }
+      case "scheduleStartTaskRun": {
+        const { taskRunIds, actingAgentId, initiatingTaskRunId } = input;
+        data = this.taskManager.scheduleStartTaskRuns(
+          taskRunIds,
+          actingAgentId,
+          {
+            initiatingTaskRunId,
+            signal: (run.context as any)["task_run_signal"],
+          },
+        );
+        break;
+      }
       case "stopTaskRun":
         data = this.taskManager.stopTaskRun(
           input.taskRunId,
