@@ -17,7 +17,7 @@ jobs:
       - name: Setup mise
         uses: ./.github/actions/setup
         with:
-          cache-key-prefix: 'beeai-supervisor'
+          cache-key-prefix: 'beekeeper'
           node-version: '22'
       
       - name: Build project
