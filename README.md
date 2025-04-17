@@ -93,7 +93,7 @@ OPENAI_MODEL_OPERATOR="gpt-4o"
 
 ```
 # LLM Provider (ollama/openai)
-LLM_BACKEND="openai"
+LLM_BACKEND="ollama"
 
 ## Ollama
 OLLAMA_BASE_URL="http://0.0.0.0:11434/api"
@@ -104,6 +104,27 @@ OLLAMA_MODEL_OPERATOR="deepseek-r1:8b"
 > Important Note: When using **Ollama**, ensure your model supports tool calling. Smaller models may lead to frequent incorrect tool calls. For stability, use a larger model like `qwq:32b`.
 
 </details>
+
+<details>
+  <summary>Combination of OpenAI / Ollama</summary>
+
+```
+# LLM Provider (ollama/openai)
+LLM_BACKEND_SUPERVISOR="openai"
+LLM_BACKEND_OPERATOR="ollama"
+
+## OpenAI
+OPENAI_API_KEY="<YOUR_OPEN_AI_API_KEY_HERE>"
+OPENAI_MODEL_SUPERVISOR="gpt-4o"
+
+## Ollama
+OLLAMA_BASE_URL="http://0.0.0.0:11434/api"
+OLLAMA_MODEL_OPERATOR="deepseek-r1:8b"
+```
+
+</details>
+
+
 
 **2. Set your search tool**
 
