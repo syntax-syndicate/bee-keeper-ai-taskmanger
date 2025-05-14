@@ -91,8 +91,8 @@ importers:
         specifier: ^18.15.3
         version: 18.19.76
       beeai-framework:
-        specifier: 0.1.13
-        version: 0.1.13(1e731d470ef7bba547a2dc577bb7fb9c)
+        specifier: 0.1.14
+        version: 0.1.14(1e731d470ef7bba547a2dc577bb7fb9c)
       cross-env:
         specifier: ^7.0.3
         version: 7.0.3
@@ -150,24 +150,11 @@ packages:
       zod:
         optional: true
 
-  '@ai-sdk/provider-utils@2.1.14':
-    resolution: {integrity: sha512-0fNQwstwqHP+cE9bP9nQXeEhY/qJRGW5Y+AQrvwzd0EI2+gH1GmwI1IC/gIOksmz/gRy4G+kXXD+Fbq4T/jCbA==}
-    engines: {node: '>=18'}
-    peerDependencies:
-      zod: ^3.0.0
-    peerDependenciesMeta:
-      zod:
-        optional: true
-
   '@ai-sdk/provider-utils@2.2.7':
     resolution: {integrity: sha512-kM0xS3GWg3aMChh9zfeM+80vEZfXzR3JEUBdycZLtbRZ2TRT8xOj3WodGHPb06sUK5yD7pAXC/P7ctsi2fvUGQ==}
     engines: {node: '>=18'}
     peerDependencies:
       zod: ^3.23.8
-
-  '@ai-sdk/provider@1.0.12':
-    resolution: {integrity: sha512-88Uu1zJIE1UUOVJWfE2ybJXgiH8JJ97QY9fbmplErEbfa/k/1kF+tWMVAAJolF2aOGmazQGyQLhv4I9CCuVACw==}
-    engines: {node: '>=18'}
 
   '@ai-sdk/provider@1.0.9':
     resolution: {integrity: sha512-jie6ZJT2ZR0uVOVCDc9R2xCX5I/Dum/wEK28lx21PJx6ZnFAN9EzD2WsPhcDWfCgGx3OAZZ0GyM3CEobXpa9LA==}
@@ -1816,15 +1803,15 @@ packages:
     peerDependencies:
       bee-agent-framework: '>=0.0.27 <0.1.0'
 
-  beeai-framework@0.1.13:
-    resolution: {integrity: sha512-p5MuOyk2xbm6f0zuVKFi/U1B39iaFKY3qw2EJKG+5T1De4NxE6WNxyioUMSRxI2/CqUl6tBeKCdSI6oz4PqYvg==}
+  beeai-framework@0.1.14:
+    resolution: {integrity: sha512-Gko3IN+R/OR+fQ99io/LL66gdsA/eI49PiOmiqPcZKF3/v2sEUSg7fzn3vjLrky7331T2QbwTNRRkCCW4bvpsA==}
     peerDependencies:
       '@ai-sdk/amazon-bedrock': ^2.2.8
       '@ai-sdk/anthropic': ^1.2.10
       '@ai-sdk/azure': ^1.3.14
       '@ai-sdk/google-vertex': ^2.2.15
       '@ai-sdk/groq': ^1.2.8
-      '@ai-sdk/openai': ^1.3.13
+      '@ai-sdk/openai': ^1.3.21
       '@aws-sdk/client-bedrock-runtime': ^3.772.0
       '@elastic/elasticsearch': ^8.0.0
       '@googleapis/customsearch': ^3.2.0
@@ -1832,6 +1819,7 @@ packages:
       '@langchain/community': '>=0.2.28'
       '@langchain/core': '>=0.2.27'
       '@modelcontextprotocol/sdk': ^1.0.4
+      '@qdrant/js-client-rest': ^1.14.0
       '@zilliz/milvus2-sdk-node': ^2.4.9
       ibm-cloud-sdk-core: '*'
       ollama-ai-provider: ^1.2.0
@@ -1861,6 +1849,8 @@ packages:
       '@langchain/core':
         optional: true
       '@modelcontextprotocol/sdk':
+        optional: true
+      '@qdrant/js-client-rest':
         optional: true
       '@zilliz/milvus2-sdk-node':
         optional: true
@@ -4039,25 +4029,12 @@ snapshots:
     optionalDependencies:
       zod: 3.24.2
 
-  '@ai-sdk/provider-utils@2.1.14(zod@3.24.2)':
-    dependencies:
-      '@ai-sdk/provider': 1.0.12
-      eventsource-parser: 3.0.0
-      nanoid: 3.3.8
-      secure-json-parse: 2.7.0
-    optionalDependencies:
-      zod: 3.24.2
-
   '@ai-sdk/provider-utils@2.2.7(zod@3.24.2)':
     dependencies:
       '@ai-sdk/provider': 1.1.3
       nanoid: 3.3.8
       secure-json-parse: 2.7.0
       zod: 3.24.2
-
-  '@ai-sdk/provider@1.0.12':
-    dependencies:
-      json-schema: 0.4.0
 
   '@ai-sdk/provider@1.0.9':
     dependencies:
@@ -5784,7 +5761,7 @@ snapshots:
       openapi-fetch: 0.11.3
       remeda: 2.21.0
 
-  beeai-framework@0.1.13(1e731d470ef7bba547a2dc577bb7fb9c):
+  beeai-framework@0.1.14(1e731d470ef7bba547a2dc577bb7fb9c):
     dependencies:
       '@ai-zen/node-fetch-event-source': 2.1.4
       '@aws-sdk/client-bedrock-runtime': 3.755.0
@@ -7048,8 +7025,8 @@ snapshots:
 
   ollama-ai-provider@1.2.0(zod@3.24.2):
     dependencies:
-      '@ai-sdk/provider': 1.0.12
-      '@ai-sdk/provider-utils': 2.1.14(zod@3.24.2)
+      '@ai-sdk/provider': 1.1.3
+      '@ai-sdk/provider-utils': 2.2.7(zod@3.24.2)
       partial-json: 0.1.7
     optionalDependencies:
       zod: 3.24.2
