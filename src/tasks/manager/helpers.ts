@@ -1,4 +1,4 @@
-import { TaskRun } from "./dto.js";
+import { TaskKindEnum, TaskRun } from "./dto.js";
 
 export function taskRunOutput(taskRun: TaskRun, checkTerminalStatus = true) {
   const record = taskRun.history.at(-1);
@@ -56,9 +56,8 @@ export function taskRunError(taskRun: TaskRun) {
   return error;
 }
 
-const TASK_INPUT_DELIMITER = "This is your input for this task:";
-const BLOCKING_TASKS_INPUT_DELIMITER =
-  "This is the output from blocking tasks:";
+const TASK_INPUT_DELIMITER = ">>> Input:";
+const BLOCKING_TASKS_INPUT_DELIMITER = ">>> Data:";
 const BLOCKING_TASK_OUTPUT_PLACEHOLDER = "${blocking_task_output}";
 
 interface TaskRunInput {
@@ -70,11 +69,19 @@ interface TaskRunInput {
   };
 }
 
-export function serializeTaskRunInput({
-  context,
-  input,
-  options: { hasUnfinishedBlockingTasks, blockingTasksOutputs },
-}: TaskRunInput): string {
+export function serializeTaskRunInput(
+  {
+    context,
+    input,
+    options: { hasUnfinishedBlockingTasks, blockingTasksOutputs },
+  }: TaskRunInput,
+  taskKind: TaskKindEnum = "operator",
+): string {
+  if (taskKind === "supervisor") {
+    // Workflow receives plain input
+    return input ?? "";
+  }
+
   let inputPart = "";
   if (input?.length) {
     inputPart += `\n\n${TASK_INPUT_DELIMITER}\n${input}`;
@@ -164,6 +171,7 @@ export function extendBlockingTaskRunOutput(
   existingTaskRunInput: string,
   blockingTaskRunOutput: string,
   hasUnfinishedBlockingTasks: boolean,
+  taskKind: TaskKindEnum = "operator",
 ) {
   const {
     context,
@@ -171,12 +179,15 @@ export function extendBlockingTaskRunOutput(
     options: { blockingTasksOutputs },
   } = deserializeTaskRunInput(existingTaskRunInput);
 
-  return serializeTaskRunInput({
-    context,
-    input,
-    options: {
-      hasUnfinishedBlockingTasks,
-      blockingTasksOutputs: `${blockingTasksOutputs ? `${blockingTasksOutputs}\n\n` : ""}${blockingTaskRunOutput}`,
+  return serializeTaskRunInput(
+    {
+      context,
+      input,
+      options: {
+        hasUnfinishedBlockingTasks,
+        blockingTasksOutputs: `${blockingTasksOutputs ? `${blockingTasksOutputs}\n\n` : ""}${blockingTaskRunOutput}`,
+      },
     },
-  });
+    taskKind,
+  );
 }

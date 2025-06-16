@@ -29,14 +29,14 @@ export type AgentTypeValue = z.infer<typeof AgentTypeValueSchema>;
 export const AgentIdValueSchema = z
   .string()
   .describe(
-    "Unique agent id composed of '{agentKind}:{agentType}[{instanceNum}]:{version}' e.g: 'supervisor:boss[1]:1' or 'operator:poem_generator[2]:3'",
+    "Unique agent id composed of '{agentKind}:{agentType}[{instanceNum}]:{version}' e.g: 'supervisor:beekeeper[1]:1' or 'operator:poem_generator[2]:3'",
   );
 export type AgentIdValue = z.infer<typeof AgentIdValueSchema>;
 
 export const AgentConfigIdValueSchema = z
   .string()
   .describe(
-    "Unique agent config id composed of '{agentKind}:{agentType}:{version}' e.g: 'supervisor:boss:1' or 'operator:poem_generator:3'",
+    "Unique agent config id composed of '{agentKind}:{agentType}:{version}' e.g: 'supervisor:beekeeper:1' or 'operator:poem_generator:3'",
   );
 export type AgentConfigIdValue = z.infer<typeof AgentConfigIdValueSchema>;
 
@@ -76,13 +76,11 @@ export const AgentConfigSchema = z.object({
     .number()
     .int()
     .min(0)
-    .default(0)
     .describe(
       "Maximum number of agents to maintain in the pool for this type.",
     ),
   autoPopulatePool: z
     .boolean()
-    .default(false)
     .describe(
       "Populates the agent pool for a specific type up to its configured size.",
     ),
@@ -118,6 +116,7 @@ export type AgentWithInstance<TAgentInstance> = Omit<Agent, "instance"> & {
 export const AvailableToolSchema = z.object({
   toolName: z.string(),
   description: z.string(),
+  toolInput: z.string().optional(),
 });
 
 export type AvailableTool = z.infer<typeof AvailableToolSchema>;

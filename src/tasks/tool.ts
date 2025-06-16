@@ -46,7 +46,7 @@ export interface TaskManagerToolResult {
 export const CreateTaskConfigSchema = z
   .object({
     method: z.literal("createTaskConfig"),
-    taskConfig: TaskConfigSchema.omit({
+    config: TaskConfigSchema.omit({
       concurrencyMode: true,
       taskConfigId: true,
       taskConfigVersion: true,
@@ -72,7 +72,7 @@ export const UpdateTaskConfigSchema = z
     method: z.literal("updateTaskConfig"),
     taskKind: TaskKindEnumSchema,
     taskType: TaskTypeValueSchema,
-    update: TaskConfigSchema.partial().pick({
+    config: TaskConfigSchema.partial().pick({
       taskConfigInput: true,
       description: true,
       intervalMs: true,
@@ -275,7 +275,7 @@ export class TaskManagerTool extends Tool<
     let data: TaskManagerToolResultData;
     switch (input.method) {
       case "createTaskConfig": {
-        const { actingAgentId, taskConfig } = input;
+        const { actingAgentId, config: taskConfig } = input;
         data = this.taskManager.createTaskConfig(
           {
             ...taskConfig,
@@ -298,7 +298,7 @@ export class TaskManagerTool extends Tool<
         break;
       }
       case "updateTaskConfig": {
-        const { update: config, taskKind, taskType, actingAgentId } = input;
+        const { config: config, taskKind, taskType, actingAgentId } = input;
         data = this.taskManager.updateTaskConfig(
           { ...config, taskKind, taskType },
           actingAgentId,
@@ -315,7 +315,7 @@ export class TaskManagerTool extends Tool<
         break;
       }
       case "getAllTaskConfigs":
-        data = this.taskManager.getAllTaskConfigs(input.actingAgentId);
+        data = this.taskManager.getTaskConfigs(input.actingAgentId);
         break;
       case "getPoolStats": {
         const { taskKind, taskType, actingAgentId } = input;
@@ -393,7 +393,7 @@ export class TaskManagerTool extends Tool<
         );
         break;
       case "getAllTaskRuns":
-        data = this.taskManager.getAllTaskRuns(input.actingAgentId);
+        data = this.taskManager.getTaskRuns(input.actingAgentId);
         break;
       case "isTaskRunOccupied":
         data = this.taskManager.isTaskRunOccupied(

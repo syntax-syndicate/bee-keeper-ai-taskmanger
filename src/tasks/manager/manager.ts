@@ -20,7 +20,7 @@ import { AgentStateLogger } from "@agents/state/logger.js";
 import { TaskStateLogger } from "@tasks/state/logger.js";
 import { WorkspaceResource } from "@workspaces/manager/index.js";
 import { WorkspaceRestorable } from "@workspaces/restore/index.js";
-import { AbortError, FrameworkError, Logger } from "beeai-framework";
+import { AbortError, Logger } from "beeai-framework";
 import { AssistantMessage, ToolMessage } from "beeai-framework/backend/message";
 import EventEmitter from "events";
 import { clone, difference, isNonNullish, omit } from "remeda";
@@ -1144,10 +1144,10 @@ export class TaskManager extends WorkspaceRestorable {
     this.persist();
   }
 
-  getAllTaskConfigs(actingAgentId: AgentIdValue) {
+  getTaskConfigs(actingAgentId: AgentIdValue, filter?: { kind: TaskKindEnum }) {
     this.logger.info({ actingAgentId }, "Getting all task configs");
 
-    const taskConfigs = Array.from(this.taskConfigs.values())
+    const all = Array.from(this.taskConfigs.values())
       .map((taskKindConfig) => Array.from(taskKindConfig.values()))
       .flat(2)
       .filter((taskConfig) =>
@@ -1158,11 +1158,11 @@ export class TaskManager extends WorkspaceRestorable {
         ),
       );
 
-    this.logger.debug(
-      { actingAgentId, count: taskConfigs.length },
-      "Retrieved task runs",
-    );
-    return taskConfigs;
+    if (filter) {
+      return all.filter((t) => t.taskKind === filter.kind);
+    }
+
+    return all;
   }
 
   createTaskRun(
@@ -1243,13 +1243,16 @@ export class TaskManager extends WorkspaceRestorable {
     const hasUnfinishedBlockingTasks = !!blockedByTaskRunIds.filter(
       (id) => (options?.originTaskRunId ?? taskRunId) !== id,
     ).length;
-    const input = serializeTaskRunInput({
-      context: `You are acting on behalf of task \`${taskRunId}\`:\n${config.description}`,
-      input: taskRunInput,
-      options: {
-        hasUnfinishedBlockingTasks,
+    const input = serializeTaskRunInput(
+      {
+        context: config.description, // context: `You are acting on behalf of task \`${taskRunId}\`:\n${config.description}`,
+        input: taskRunInput,
+        options: {
+          hasUnfinishedBlockingTasks,
+        },
       },
-    });
+      taskKind,
+    );
 
     const originTaskRunId = options?.originTaskRunId ?? taskRunId;
     const baseTaskRun: BaseTaskRun = {
@@ -1671,6 +1674,7 @@ export class TaskManager extends WorkspaceRestorable {
                 blockingTaskRun.taskRunInput,
                 taskRunOutput(taskRun, false),
                 hasOtherUnfinishedBlockedTaskRuns,
+                taskRun.taskKind,
               ),
               originTaskRunId: taskRun.originTaskRunId,
             });
@@ -2193,7 +2197,7 @@ export class TaskManager extends WorkspaceRestorable {
   /**
    * Gets all task runs visible to the agent.
    */
-  getAllTaskRuns(
+  getTaskRuns(
     agentId: AgentIdValue,
     filter?: { taskKind: TaskKindValue; taskType?: TaskTypeValue },
   ): TaskRun[] {
@@ -2335,7 +2339,7 @@ export class TaskManager extends WorkspaceRestorable {
       let addToMemory: (AssistantMessage | ToolMessage)[] | undefined =
         undefined;
       if (taskRun.taskRunKind === "interaction") {
-        const allTerminatedInteractionTaskRuns = this.getAllTaskRuns(
+        const allTerminatedInteractionTaskRuns = this.getTaskRuns(
           TASK_MANAGER_USER,
           {
             taskKind: taskRun.taskKind,
@@ -2466,13 +2470,7 @@ export class TaskManager extends WorkspaceRestorable {
                 return;
               }
 
-              let error;
-              if (err instanceof FrameworkError) {
-                error = err.explain();
-              } else {
-                error = err instanceof Error ? err.message : String(err);
-              }
-
+              const error = err instanceof Error ? err.message : String(err);
               const taskRun = taskManager.getTaskRun(taskRunId, agentId);
               const trajectory = clone(taskRun.currentTrajectory);
 
