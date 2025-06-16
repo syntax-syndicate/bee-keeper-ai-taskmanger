@@ -5,7 +5,7 @@ import "dotenv/config";
 import path from "node:path";
 import { parse } from "ts-command-line-args";
 import { createConsoleReader } from "./helpers/reader.js";
-import { ChatMonitor } from "./ui/chat-monitor/monitor.js";
+import { ChatMonitor } from "./ui/chat-monitor/chat-monitor.js";
 import { createWriteStream } from "node:fs";
 import { ensureDirectoryExistsSafe } from "./utils/file.js";
 import { getEnv } from "beeai-framework/internals/env";
@@ -95,8 +95,9 @@ async function main() {
   if (useChatMonitor) {
     // Create a write stream to a log file
     const chatMonitor = new ChatMonitor(
-      { title: "Runtime Chat Interface" },
+      { kind: "screen", title: "Runtime Chat Interface" },
       runtime,
+      logger,
     );
     await chatMonitor.start();
   } else {
