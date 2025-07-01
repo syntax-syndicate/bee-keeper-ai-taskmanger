@@ -182,7 +182,7 @@ export class ChatMonitor extends ContainerComponent {
           },
         },
         {
-          key: "C-e",
+          key: "C-r",
           action: {
             description: NavigationDescription.ROLE_FILTER,
             listener: keyActionListenerFactory(() => {
@@ -192,7 +192,7 @@ export class ChatMonitor extends ContainerComponent {
           },
         },
         {
-          key: "C-w",
+          key: "C-f",
           action: {
             description: NavigationDescription.MESSAGES_FILTER,
             listener: keyActionListenerFactory(() => {
@@ -212,7 +212,7 @@ export class ChatMonitor extends ContainerComponent {
           },
         },
         {
-          key: "C-x",
+          key: "space",
           action: {
             description: NavigationDescription.CHAT,
             listener: keyActionListenerFactory(() => {

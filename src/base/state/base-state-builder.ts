@@ -1,5 +1,5 @@
 import { EventEmitter } from "events";
-import { createReadStream, FSWatcher, watch, statSync } from "fs";
+import { createReadStream, FSWatcher, statSync, watch } from "fs";
 import { createInterface } from "readline";
 import { z } from "zod";
 import { LogInitSchema } from "./dto.js";
