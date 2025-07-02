@@ -1,18 +1,22 @@
+import { Logger } from "beeai-framework";
+import EventEmitter from "events";
 import blessed from "neo-blessed";
+import { isNonNull } from "remeda";
 import {
   ContainerComponent,
   ParentInput,
   ScreenInput,
 } from "../../base/monitor.js";
+import { UIColors } from "../../colors.js";
 import {
   ControllableContainer,
   ControllableElement,
 } from "../../controls/controls-manager.js";
-import { UIColors } from "../../colors.js";
-import { UIConfig } from "../../config.js";
-import EventEmitter from "events";
-import { isNonNull } from "remeda";
-import { Logger } from "beeai-framework";
+import {
+  getBorderedBoxStyle,
+  getCheckboxStyle,
+  getTextFieldStyle,
+} from "../config.js";
 
 export interface RoleFilterValues {
   roles: string[];
@@ -29,10 +33,13 @@ export class RoleFilter extends ContainerComponent {
   static readonly COL_WIDTH = 40;
 
   private _container: ControllableContainer;
-  private _selectAllRolesCheckbox: ControllableElement;
+  private _selectAllRolesCheckbox: ControllableElement<blessed.Widgets.CheckboxElement>;
   private knownRoles: string[] = [];
   private emitter = new EventEmitter();
-  private roleCheckboxes: Record<string, ControllableElement> = {};
+  private roleCheckboxes: Record<
+    string,
+    ControllableElement<blessed.Widgets.CheckboxElement>
+  > = {};
 
   // Filter settings
   private messageRoleFilters: Record<string, boolean> = {};
@@ -78,7 +85,7 @@ export class RoleFilter extends ContainerComponent {
     // Role filter box area
     this._container = this.controlsManager.add({
       kind: "container",
-      name: "roleFilterBox",
+      name: "role_filter_box",
       element: blessed.box({
         parent: this.parent.element,
         width: "100%",
@@ -89,19 +96,7 @@ export class RoleFilter extends ContainerComponent {
         mouse: false,
         keys: false,
         focusable: false,
-        border: {
-          type: "line",
-        },
-        style: {
-          border: {
-            fg: UIColors.white.white,
-          },
-          focus: {
-            border: {
-              fg: UIColors.blue.cyan,
-            },
-          },
-        },
+        ...getBorderedBoxStyle(),
       }),
       parent: this.parent,
     });
@@ -112,15 +107,17 @@ export class RoleFilter extends ContainerComponent {
       content: "Role Filters:",
       left: 2,
       top: 0,
-      style: {
-        bold: true,
-      },
+      ...getTextFieldStyle({
+        style: {
+          bold: true,
+        },
+      }),
     });
 
     // "Select All" checkbox for roles
     this._selectAllRolesCheckbox = this.controlsManager.add({
       kind: "element",
-      name: "selectAllRolesCheckbox",
+      name: "select_all_roles_checkbox",
       element: blessed.checkbox({
         parent: this.container.element,
         content: "Select All",
@@ -130,12 +127,11 @@ export class RoleFilter extends ContainerComponent {
         mouse: false,
         keys: false,
         focusable: false,
-        style: {
-          fg: UIColors.green.green,
-          focus: {
-            fg: UIConfig.colors.focused,
+        ...getCheckboxStyle(true, {
+          style: {
+            fg: UIColors.green.green,
           },
-        },
+        }),
       }),
       parent: this.container,
     });
@@ -210,11 +206,7 @@ export class RoleFilter extends ContainerComponent {
         left: 2 + col * RoleFilter.COL_WIDTH,
         top: 4 + row, // +4 to account for title and Select All
         checked: true, // New roles are visible by default
-        style: {
-          focus: {
-            fg: UIConfig.colors.focused,
-          },
-        },
+        ...getCheckboxStyle(true),
         mouse: false,
         tags: true,
       }),
